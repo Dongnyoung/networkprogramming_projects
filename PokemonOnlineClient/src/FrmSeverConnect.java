@@ -4,9 +4,12 @@ import java.awt.Image;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.regex.Pattern;
 
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -31,6 +34,8 @@ public class FrmSeverConnect extends JFrame {
 	private final JLabel lblIP = new JLabel("IP: ");
 	private final JLabel lblPort = new JLabel("Port: ");
 	private final JLabel lblName = new JLabel("Name: ");
+	private final JButton btnConnect = new JButton("Connect");
+	private final JButton btnExit = new JButton("Exit");
 	/**
 	 * Launch the application.
 	 */
@@ -98,10 +103,10 @@ public class FrmSeverConnect extends JFrame {
 		txtName.setFont(new Font("PF Stardust Bold", Font.BOLD, 28));
 		
 		setTitle("Pokemon Online");
-		setIconImage(Toolkit.getDefaultToolkit().getImage("Images\\icon.png"));
+		setIconImage(Toolkit.getDefaultToolkit().getImage("Images/icon.png"));
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		
-		ImageIcon bgImage = new ImageIcon("Images\\bg_main.png");
+		ImageIcon bgImage = new ImageIcon("Images/bg_main.png");
 		//가로 세로길이 얻기
 		w = bgImage.getIconWidth();
 		h = bgImage.getIconHeight();
@@ -128,12 +133,32 @@ public class FrmSeverConnect extends JFrame {
 		lblName.setBounds(313, 560, 100, 36);
 		txtName.setBounds(406, 560, 307, 36);
 
+		btnConnect.setFont(fieldFont);
+	    btnConnect.setBounds(313, 630, 190, 50);
+	    
+	    btnExit.setFont(fieldFont);
+	    btnExit.setBounds(523, 630, 190, 50); 
+	    
+	    MyAction action = new MyAction();
+	    btnConnect.addActionListener(action);
+	    txtIP.addActionListener(action);
+	    txtPort.addActionListener(action);
+	    txtName.addActionListener(action);
+	    
+	    // 나가기 버튼 액션 (그냥 프로그램 종료)
+	    btnExit.addActionListener(e -> {
+	        // 전체 프로그램 종료
+	        System.exit(0);
+	    });
+	    
 		PnlBackGround.add(lblIP);
 		PnlBackGround.add(txtIP);
 		PnlBackGround.add(lblPort);
 		PnlBackGround.add(txtPort);
 		PnlBackGround.add(lblName);
 		PnlBackGround.add(txtName);
+		PnlBackGround.add(btnConnect);
+		PnlBackGround.add(btnExit); 
 		setContentPane(PnlBackGround);
 		pack();
 		setLocationRelativeTo(null);
@@ -266,5 +291,55 @@ public class FrmSeverConnect extends JFrame {
 		String ipRegex = "^((25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1?\\d?\\d)$";
 		return Pattern.matches(ipRegex, s);
 	}
+	class MyAction implements ActionListener {
+	    @Override
+	    public void actionPerformed(ActionEvent e) {
+	        String username = txtName.getText().trim();
+	        String ip = txtIP.getText().trim();
+	        String port = txtPort.getText().trim();
+
+	        // 간단 입력 체크 (필요하면 더 추가)
+	        if (username.isEmpty() || ip.isEmpty() || port.isEmpty()) {
+	            JOptionPane.showMessageDialog(
+	                FrmSeverConnect.this,
+	                "IP, Port, Name을 모두 입력해 주세요.",
+	                "입력 오류",
+	                JOptionPane.WARNING_MESSAGE
+	            );
+	            return;
+	        }
+
+	        // 이미 만든 유효성 검사 재활용 가능
+	        if (!isValidFullIP(ip)) {
+	            JOptionPane.showMessageDialog(
+	                FrmSeverConnect.this,
+	                "유효한 IP 형식이 아닙니다. 예: 192.168.0.1",
+	                "입력 오류",
+	                JOptionPane.WARNING_MESSAGE
+	            );
+	            txtIP.requestFocus();
+	            return;
+	        }
+
+	        if (!isValidPort(port)) {
+	            JOptionPane.showMessageDialog(
+	                FrmSeverConnect.this,
+	                "유효한 포트 범위가 아닙니다. 1-65535 사이의 숫자를 입력하세요.",
+	                "입력 오류",
+	                JOptionPane.WARNING_MESSAGE
+	            );
+	            txtPort.requestFocus();
+	            return;
+	        }
+	        //포켓몬 고르기 + 대기창
+	        //WaitingRoomFrame waiting = new WaitingRoomFrame(username, ip, port);
+	        //waiting.setVisible(true);
+
+	        // 이 창은 숨기거나 종료
+	        // setVisible(false);
+	        dispose(); // 자원까지 정리하고 싶으면 이쪽이 더 깔끔
+	    }
+	}
+
 
 }
