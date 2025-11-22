@@ -2,12 +2,20 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Image;
+import java.awt.Color;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.File;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.net.Socket;
 
 import javax.swing.ImageIcon;
+import javax.swing.Timer;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -25,20 +33,37 @@ public class JplWaitingRoom extends JPanel {
 	private JButton btnPokemon1;
 	private JButton btnPokemon2;
 	private JButton btnPokemon3;
+	private JButton btnPokemon4; // 랜덤 볼
+
+	// ball sprite frames and animation state
+	private ImageIcon[] ballFrames;
+	// select sprite frames (4분할된 select.png)
+	private ImageIcon[] selectFrames;
+	// select overlay label shown above buttons
+	private JLabel lblSelectOverlay;
+	private boolean hover1 = false, hover2 = false, hover3 = false;
+	private boolean hover4 = false;
+	private Timer animTimer;
+	private Timer randomPreviewTimer;
+	private int animFrame = 0;
+	private int randomIndex = 0;
 	
 	// 선택된 포켓몬 (1, 2, 3 중 하나, 0은 미선택)
 	private int selectedPokemon = 0;
 	
-	// 준비완료 버튼
-	private JButton btnReady;
-	
-	// 게임 시작 버튼
-	private JButton btnStart;
+	// (준비/게임 시작 버튼은 UI에서 제거됨)
 	
 	// 상태 표시 라벨
 	private JLabel lblStatus;
 	private JLabel lblMyStatus;
 	private JLabel lblOpponentStatus;
+	// 우상단 남은시간 라벨
+	private JLabel lblTimer;
+
+	// 상태 라벨 타이핑 애니메이션
+	private Timer statusTypingTimer;
+	private int typingIndex = 0;
+	private String typingTarget = "";
 	
 	// 서버 통신 관련
 	private Socket socket;
@@ -52,6 +77,14 @@ public class JplWaitingRoom extends JPanel {
 	
 	// 포켓몬 이름들 (이미지 파일명과 매칭)
 	private String[] pokemonNames = {"이상해씨", "파이리", "꼬부기"};
+	// 포켓몬 종 id들 (pokemon_species.json의 id와 매칭)
+	private String[] pokemonIds = {"bulbasaur", "charmander", "squirtle"};
+	
+	// 중앙 미리보기 라벨(배경)과 몬스터 이미지 라벨
+	private JLabel lblCenter;
+	private JLabel lblCenterMonster;
+	// 선택 확정 상태
+	private boolean selectionLocked = false;
 	
 	public JplWaitingRoom(String username, String ip, String port) {
 		this.username = username;
@@ -89,100 +122,418 @@ public class JplWaitingRoom extends JPanel {
 		}
 		
 		// 폰트 설정
-		Font fieldFont = new Font("PF Stardust Bold", Font.BOLD, 24);
+		Font fieldFont = new Font("PF Stardust Bold", Font.BOLD, 28);
 		
 		// 포켓몬 선택 버튼들 생성 (가로로 배치)
 		btnPokemon1 = new JButton();
-		btnPokemon1.setBounds(200, 300, 150, 150);
+		btnPokemon1.setBounds(230, 330, 96, 80);
 		btnPokemon1.setOpaque(false);
 		btnPokemon1.setContentAreaFilled(false);
 		btnPokemon1.setBorderPainted(false);
-		btnPokemon1.addActionListener(e -> selectPokemon(1));
+		btnPokemon1.setFocusPainted(false);
+		btnPokemon1.addActionListener(e -> confirmAndSelect(1));
+		btnPokemon1.addMouseListener(new MouseAdapter() {
+			@Override public void mouseEntered(MouseEvent e){
+				hover1 = true;
+				if (!selectionLocked) showPreviewFor(1);
+				if (!selectionLocked) showSelectOverlay(1);
+			}
+			@Override public void mouseExited(MouseEvent e){
+				hover1 = false;
+				if (!selectionLocked) hidePreview();
+				if (!selectionLocked) hideSelectOverlay();
+			}
+		});
+
 		
 		btnPokemon2 = new JButton();
-		btnPokemon2.setBounds(400, 300, 150, 150);
+		btnPokemon2.setBounds(373, 410, 96, 80);
 		btnPokemon2.setOpaque(false);
 		btnPokemon2.setContentAreaFilled(false);
 		btnPokemon2.setBorderPainted(false);
-		btnPokemon2.addActionListener(e -> selectPokemon(2));
+		btnPokemon2.setFocusPainted(false);
+		btnPokemon2.addActionListener(e -> confirmAndSelect(2));
+		btnPokemon2.addMouseListener(new MouseAdapter() {
+			@Override public void mouseEntered(MouseEvent e){
+				hover2 = true;
+				if (!selectionLocked) showPreviewFor(2);
+				if (!selectionLocked) showSelectOverlay(2);
+			}
+			@Override public void mouseExited(MouseEvent e){
+				hover2 = false;
+				if (!selectionLocked) hidePreview();
+				if (!selectionLocked) hideSelectOverlay();
+			}
+		});
+
 		
 		btnPokemon3 = new JButton();
-		btnPokemon3.setBounds(600, 300, 150, 150);
+		btnPokemon3.setBounds(555, 410, 96, 80);
 		btnPokemon3.setOpaque(false);
 		btnPokemon3.setContentAreaFilled(false);
 		btnPokemon3.setBorderPainted(false);
-		btnPokemon3.addActionListener(e -> selectPokemon(3));
+		btnPokemon3.setFocusPainted(false);
+		btnPokemon3.addActionListener(e -> confirmAndSelect(3));
+		btnPokemon3.addMouseListener(new MouseAdapter() {
+			@Override public void mouseEntered(MouseEvent e){
+				hover3 = true;
+				if (!selectionLocked) showPreviewFor(3);
+				if (!selectionLocked) showSelectOverlay(3);
+			}
+			@Override public void mouseExited(MouseEvent e){
+				hover3 = false;
+				if (!selectionLocked) hidePreview();
+				if (!selectionLocked) hideSelectOverlay();
+			}
+		});
+
+
+		// 랜덤 몬스터볼 버튼
+		btnPokemon4 = new JButton();
+		btnPokemon4.setBounds(700, 330, 96, 80);
+		btnPokemon4.setOpaque(false);
+		btnPokemon4.setContentAreaFilled(false);
+		btnPokemon4.setBorderPainted(false);
+		btnPokemon4.setFocusPainted(false);
+		btnPokemon4.addActionListener(e -> confirmAndSelectRandom());
+		btnPokemon4.addMouseListener(new MouseAdapter() {
+			@Override public void mouseEntered(MouseEvent e){
+				hover4 = true;
+				if (!selectionLocked) startRandomPreview();
+				if (!selectionLocked) showSelectOverlay(4);
+			}
+			@Override public void mouseExited(MouseEvent e){
+				hover4 = false;
+				if (!selectionLocked) stopRandomPreview();
+				if (!selectionLocked) hideSelectOverlay();
+			}
+		});
+
 		
-		// 포켓몬 이미지 로드
-		loadPokemonImages();
+		// ball sprite 로드 및 애니메이션 초기화
+		loadBallSprite();
 		
-		// 준비완료 버튼
-		btnReady = new JButton("준비완료");
-		btnReady.setFont(fieldFont);
-		btnReady.setBounds(350, 500, 150, 50);
-		btnReady.setEnabled(false);
-		btnReady.addActionListener(e -> sendReady());
-		
-		// 게임 시작 버튼
-		btnStart = new JButton("게임 시작");
-		btnStart.setFont(fieldFont);
-		btnStart.setBounds(350, 570, 150, 50);
-		btnStart.setEnabled(false);
-		btnStart.addActionListener(e -> sendStart());
+		// (준비/게임 시작 버튼 제거 — 선택 즉시 준비 처리)
 		
 		// 상태 표시 라벨
-		lblStatus = new JLabel("포켓몬을 선택하세요");
+		lblStatus = new JLabel("");
 		lblStatus.setFont(fieldFont);
-		lblStatus.setBounds(300, 200, 400, 40);
+		lblStatus.setBounds(100, 620, 800, 40);
 		lblStatus.setOpaque(false);
 		
-		lblMyStatus = new JLabel("나: "+ username+"(대기중)");
-		lblMyStatus.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
-		lblMyStatus.setBounds(200, 100, 300, 30);
+		lblMyStatus = new JLabel("■ " + username+"(나): 포켓몬 선택중");
+		lblMyStatus.setFont(new Font("PF Stardust Bold", Font.BOLD, 24));
+		lblMyStatus.setBounds(13, 10, 360, 34);
 		lblMyStatus.setOpaque(false);
+		lblMyStatus.setForeground(new Color(245, 245, 220)); // 베이지
 		
-		lblOpponentStatus = new JLabel("상대방: 대기중");
-		lblOpponentStatus.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
-		lblOpponentStatus.setBounds(500, 100, 300, 30);
+		lblOpponentStatus = new JLabel("■ " + "상대: 상대의 접속을 기다리는중...");
+		lblOpponentStatus.setFont(new Font("PF Stardust Bold", Font.BOLD, 24));
+		lblOpponentStatus.setBounds(13, 46, 360, 34);
 		lblOpponentStatus.setOpaque(false);
+		lblOpponentStatus.setForeground(new Color(245, 245, 220)); // 베이지
+
+		// 우상단 남은시간 라벨 초기화 (초기값 15)
+		lblTimer = new JLabel("15");
+		lblTimer.setFont(new Font("PF Stardust Bold", Font.BOLD, 50));
+		lblTimer.setForeground(new Color(245, 245, 220)); // 베이지
+		int tx = Math.max(0, w - 90);
+		lblTimer.setBounds(tx, 20, 100, 50);
+		lblTimer.setOpaque(false);
+
+		// 중앙에 표시할 이미지 라벨 (pnl_unselect.png)
+		int cw = 244, ch = 244; // 중앙 라벨 크기
+		int cx = Math.max(0, (w - cw) / 2);
+		int cy = Math.max(0, (h - ch) / 2) - 150;
+		lblCenter = new JLabel();
+		lblCenter.setBounds(cx, cy, cw, ch);
+		lblCenter.setOpaque(false);
+		lblCenter.setVisible(false);
+		try {
+			ImageIcon rawCenter = new ImageIcon("Images/pnl_unselect.png");
+			java.awt.Image cimg = rawCenter.getImage().getScaledInstance(cw, ch, java.awt.Image.SCALE_SMOOTH);
+			lblCenter.setIcon(new ImageIcon(cimg));
+		} catch (Exception ex) {
+			// 이미지가 없거나 로드 실패하면 무시
+		}
+		// 몬스터 이미지를 올릴 라벨 (위에 올라오도록 별도 라벨로 추가)
+		lblCenterMonster = new JLabel();
+		lblCenterMonster.setBounds(cx, cy, cw, ch);
+		lblCenterMonster.setOpaque(false);
+		lblCenterMonster.setVisible(false);
+		// select overlay 라벨 (버튼 위에 표시할 스프라이트)
+		lblSelectOverlay = new JLabel();
+		lblSelectOverlay.setOpaque(false);
+		lblSelectOverlay.setVisible(false);
+		add(lblCenter);
+		add(lblCenterMonster);
+		add(lblSelectOverlay);
+		add(btnPokemon4);
 		
 		add(btnPokemon1);
 		add(btnPokemon2);
 		add(btnPokemon3);
-		add(btnReady);
-		add(btnStart);
 		add(lblStatus);
 		add(lblMyStatus);
 		add(lblOpponentStatus);
-	}
-	
-	private void loadPokemonImages() {
+		add(lblTimer);
+
+		// 중앙 프리뷰가 버튼에 가려지지 않도록 최상위로 올립니다.
 		try {
-			ImageIcon icon1 = new ImageIcon("Images/Isanghaessi.png");
-			if (icon1.getIconWidth() != -1) {
-				Image img1 = icon1.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
-				btnPokemon1.setIcon(new ImageIcon(img1));
-			} else {
-				btnPokemon1.setText(pokemonNames[0]);
+			// 우상단 타이머와 select overlay를 최상단으로 배치
+			if (lblTimer != null) setComponentZOrder(lblTimer, 0);
+			if (lblOpponentStatus != null) setComponentZOrder(lblOpponentStatus, 1);
+			if (lblSelectOverlay != null) setComponentZOrder(lblSelectOverlay, 2);
+			setComponentZOrder(lblCenterMonster, 3);
+			setComponentZOrder(lblCenter, 4);
+		} catch (Exception ex) {
+			// 무시
+		}
+
+		// 상태 라벨 타이핑 애니메이션 시작
+		startStatusTyping("포켓몬을 선택하세요.");
+
+		// 랜덤 프리뷰 타이머 (빠르게 전환)
+		randomPreviewTimer = new Timer(80, ev -> {
+			randomIndex = (randomIndex + 1) % pokemonIds.length;
+			// 직접 이미지 설정 (파일 경로는 species front 경로 사용)
+			String id = pokemonIds[randomIndex];
+			Pokemon p = PokemonRepository.getInstance().getById(id);
+			if (p != null) {
+				String front = p.getFrontImageFile();
+				try {
+					ImageIcon raw = new ImageIcon(front);
+					int mw = 220, mh = 220;
+					java.awt.Image mimg = raw.getImage().getScaledInstance(mw, mh, java.awt.Image.SCALE_SMOOTH);
+					lblCenterMonster.setIcon(new ImageIcon(mimg));
+					lblCenter.setVisible(true);
+					lblCenterMonster.setVisible(true);
+				} catch (Exception ex) {
+					// ignore
+				}
 			}
-			
-			ImageIcon icon2 = new ImageIcon("Images/fire.png");
-			if (icon2.getIconWidth() != -1) {
-				Image img2 = icon2.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
-				btnPokemon2.setIcon(new ImageIcon(img2));
-			} else {
-				btnPokemon2.setText(pokemonNames[1]);
+		});
+
+		// select sprite 로드 (Images/select.png, 4프레임 가로분할)
+		try {
+			BufferedImage selectSprite = ImageIO.read(new File("Images/select.png"));
+			int frames = 4;
+			int fw = selectSprite.getWidth() / frames;
+			int fh = selectSprite.getHeight();
+			selectFrames = new ImageIcon[frames];
+			for (int i = 0; i < frames; i++) {
+				BufferedImage sub = selectSprite.getSubimage(i * fw, 0, fw, fh);
+				// 버튼 크기에 맞춰 스케일 (가로 -> 96)
+				int targetW = 96;
+				int targetH = (int) ((double) fh * targetW / fw);
+				java.awt.Image scaled = sub.getScaledInstance(targetW, targetH, java.awt.Image.SCALE_SMOOTH);
+				selectFrames[i] = new ImageIcon(scaled);
 			}
-			
-			ImageIcon icon3 = new ImageIcon("Images/GGoboogie.png");
-			if (icon3.getIconWidth() != -1) {
-				Image img3 = icon3.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
-				btnPokemon3.setIcon(new ImageIcon(img3));
-			} else {
-				btnPokemon3.setText(pokemonNames[2]);
+		} catch (Exception ex) {
+			// select sprite 로드 실패 시 무시
+		}
+
+		// 보장: 시작 시 상대 상태는 '상대를 찾는중...'으로 보이게 하고 최상단 근처로 올려둡니다.
+		if (lblOpponentStatus != null) {
+			lblOpponentStatus.setText("■ 상대를 찾는중...");
+			lblOpponentStatus.setForeground(new Color(245, 245, 220));
+			lblOpponentStatus.setVisible(true);
+			try { setComponentZOrder(lblOpponentStatus, 1); } catch (Exception ex) {}
+		}
+	}
+
+	/**
+	 * 호버 시 중앙에 미리보기(포켓몬 전면 이미지)를 표시합니다.
+	 */
+	private void showPreviewFor(int pokemonNum) {
+		if (pokemonNum < 1 || pokemonNum > pokemonIds.length) return;
+		String id = pokemonIds[pokemonNum - 1];
+		System.out.println("showPreviewFor called for pokemonNum=" + pokemonNum + ", id=" + id);
+		Pokemon p = PokemonRepository.getInstance().getById(id);
+		if (p == null) {
+			System.out.println("PokemonRepository.getById returned null for id=" + id);
+			return;
+		}
+		String front = p.getFrontImageFile();
+		System.out.println("front image path: " + front);
+		try {
+			ImageIcon raw = new ImageIcon(front);
+			int mw = 220, mh = 220;
+			java.awt.Image mimg = raw.getImage().getScaledInstance(mw, mh, java.awt.Image.SCALE_SMOOTH);
+			lblCenterMonster.setIcon(new ImageIcon(mimg));
+			System.out.println("preview image set for id=" + id);
+			// 가운데에 맞추기
+			int cx = lblCenter.getX();
+			int cy = lblCenter.getY();
+			int cw = lblCenter.getWidth();
+			int ch = lblCenter.getHeight();
+			int mx = cx + (cw - mw) / 2;
+			int my = cy + (ch - mh) / 2;
+			lblCenterMonster.setBounds(mx, my, mw, mh);
+			lblCenter.setVisible(true);
+			lblCenterMonster.setVisible(true);
+		} catch (Exception ex) {
+			// 무시
+		}
+	}
+
+	private void hidePreview() {
+		lblCenterMonster.setVisible(false);
+		lblCenter.setVisible(false);
+	}
+
+	private void showSelectOverlay(int pokemonNum) {
+		if (selectFrames == null) return;
+		if (pokemonNum < 1 || pokemonNum > selectFrames.length) return;
+		// 버튼 위치에 맞춰 overlay 크기와 위치를 설정
+		javax.swing.JButton target = null;
+		switch (pokemonNum) {
+			case 1: target = btnPokemon1; break;
+			case 2: target = btnPokemon2; break;
+			case 3: target = btnPokemon3; break;
+			case 4: target = btnPokemon4; break;
+		}
+		if (target == null) return;
+		int bw = target.getWidth();
+		int bh = target.getHeight();
+		int bx = target.getX();
+		int by = target.getY() - 20;
+		ImageIcon icon = selectFrames[pokemonNum - 1];
+		int iw = icon.getIconWidth();
+		int ih = icon.getIconHeight();
+		// overlay는 버튼 위에 중앙 정렬, 약간 위로 띄워 표시
+		int ox = bx + (bw - iw) / 2;
+		int oy = by - ih + (bh / 2);
+		lblSelectOverlay.setIcon(icon);
+		lblSelectOverlay.setBounds(ox, oy, iw, ih);
+		lblSelectOverlay.setVisible(true);
+	}
+
+	private void hideSelectOverlay() {
+		if (lblSelectOverlay != null) lblSelectOverlay.setVisible(false);
+	}
+
+	/**
+	 * 상태 라벨을 한 글자씩 표시하는 타이핑 애니메이션을 시작합니다.
+	 */
+	private void startStatusTyping(String message) {
+		stopStatusTyping();
+		typingTarget = (message == null) ? "" : message;
+		typingIndex = 0;
+		lblStatus.setText("");
+		int delay = 70; // ms per character
+		statusTypingTimer = new Timer(delay, ev -> {
+			if (typingIndex <= typingTarget.length()) {
+				typingIndex++;
+				int end = Math.min(typingIndex, typingTarget.length());
+				lblStatus.setText(typingTarget.substring(0, end));
+				if (end >= typingTarget.length()) {
+					stopStatusTyping();
+				}
 			}
+		});
+		statusTypingTimer.setInitialDelay(delay);
+		statusTypingTimer.start();
+	}
+
+	private void stopStatusTyping() {
+		if (statusTypingTimer != null && statusTypingTimer.isRunning()) {
+			statusTypingTimer.stop();
+		}
+		statusTypingTimer = null;
+	}
+
+	private void startRandomPreview() {
+		randomIndex = 0;
+		if (randomPreviewTimer != null && !randomPreviewTimer.isRunning()) randomPreviewTimer.start();
+	}
+
+	private void stopRandomPreview() {
+		if (randomPreviewTimer != null && randomPreviewTimer.isRunning()) randomPreviewTimer.stop();
+		lblCenterMonster.setVisible(false);
+		lblCenter.setVisible(false);
+	}
+
+	private void confirmAndSelectRandom() {
+		int res = JOptionPane.showConfirmDialog(this,
+				"랜덤 포켓몬을 선택하시겠습니까?",
+				"랜덤 선택", JOptionPane.YES_NO_OPTION);
+		if (res == JOptionPane.YES_OPTION) {
+			// pick a random index among 0..pokemonIds.length-1
+			int r = (int)(Math.random() * pokemonIds.length);
+			selectPokemon(r + 1); // selectPokemon expects 1-based index
+		}
+	}
+
+	/**
+	 * 클릭 시 확인 후 선택 확정 처리
+	 */
+	private void confirmAndSelect(int pokemonNum) {
+		if (pokemonNum < 1 || pokemonNum > pokemonNames.length) return;
+		String pname = pokemonNames[pokemonNum - 1];
+		int res = JOptionPane.showConfirmDialog(this,
+				pname + "을(를) 선택하시겠습니까?",
+				"포켓몬 선택", JOptionPane.YES_NO_OPTION);
+		if (res == JOptionPane.YES_OPTION) {
+			selectPokemon(pokemonNum); // 기존 selectPokemon 재사용
+		}
+	}
+
+	
+	private void loadBallSprite() {
+		// ball 스프라이트 시트 로드 및 프레임 분할
+		try {
+			BufferedImage sprite = ImageIO.read(new File("Images/ball.png"));
+			int frames = 4;
+			int fw = sprite.getWidth() / frames;
+			int fh = sprite.getHeight();
+			ballFrames = new ImageIcon[frames];
+			for (int i = 0; i < frames; i++) {
+				BufferedImage sub = sprite.getSubimage(i * fw, 0, fw, fh);
+				Image scaled = sub.getScaledInstance(96, 80, Image.SCALE_SMOOTH);
+				ballFrames[i] = new ImageIcon(scaled);
+			}
+			// 초기 아이콘 할당
+			btnPokemon1.setIcon(ballFrames[0]);
+			btnPokemon2.setIcon(ballFrames[0]);
+			btnPokemon3.setIcon(ballFrames[0]);
+			// 랜덤 볼도 기본 아이콘 할당
+			if (btnPokemon4 != null) btnPokemon4.setIcon(ballFrames[0]);
+			// 비활성화 시에도 아이콘이 회색으로 변하지 않도록 disabledIcon을 동일하게 설정
+			btnPokemon1.setDisabledIcon(ballFrames[0]);
+			btnPokemon2.setDisabledIcon(ballFrames[0]);
+			btnPokemon3.setDisabledIcon(ballFrames[0]);
+			if (btnPokemon4 != null) btnPokemon4.setDisabledIcon(ballFrames[0]);
+			// 애니메이션 타이머
+				animTimer = new Timer(120, ev -> {
+					animFrame = (animFrame + 1) % ballFrames.length;
+					if (hover1) btnPokemon1.setIcon(ballFrames[animFrame]); else btnPokemon1.setIcon(ballFrames[0]);
+					if (hover2) btnPokemon2.setIcon(ballFrames[animFrame]); else btnPokemon2.setIcon(ballFrames[0]);
+					if (hover3) btnPokemon3.setIcon(ballFrames[animFrame]); else btnPokemon3.setIcon(ballFrames[0]);
+					// 랜덤 볼 애니메이션 처리 (hover4에 따라)
+					if (btnPokemon4 != null) {
+						if (hover4) btnPokemon4.setIcon(ballFrames[animFrame]); else btnPokemon4.setIcon(ballFrames[0]);
+					}
+					// select overlay 애니메이션: hover 중이면 selectFrames를 animFrame으로 순환하여 표시
+					if (selectFrames != null && !selectionLocked) {
+						int active = 0;
+						if (hover1) active = 1;
+						else if (hover2) active = 2;
+						else if (hover3) active = 3;
+						else if (hover4) active = 4;
+						if (active > 0) {
+							int sf = animFrame % selectFrames.length;
+							// 위치 재설정 (버튼에 맞춰)
+							showSelectOverlay(active);
+							lblSelectOverlay.setIcon(selectFrames[sf]);
+							lblSelectOverlay.setVisible(true);
+						} else {
+							if (lblSelectOverlay != null) lblSelectOverlay.setVisible(false);
+						}
+					}
+				});
+			animTimer.start();
 		} catch (Exception e) {
-			// 이미지 로드 실패 시 텍스트로 표시
 			btnPokemon1.setText(pokemonNames[0]);
 			btnPokemon2.setText(pokemonNames[1]);
 			btnPokemon3.setText(pokemonNames[2]);
@@ -190,18 +541,52 @@ public class JplWaitingRoom extends JPanel {
 	}
 	
 	private void selectPokemon(int pokemonNum) {
+		// 선택 확정 처리
+		// 중간에 타이핑 애니메이션이 돌고 있으면 중지
+		stopStatusTyping();
 		selectedPokemon = pokemonNum;
-		
-		// 선택된 포켓몬 강조 (버튼 테두리 표시)
-		btnPokemon1.setBorderPainted(selectedPokemon == 1);
-		btnPokemon2.setBorderPainted(selectedPokemon == 2);
-		btnPokemon3.setBorderPainted(selectedPokemon == 3);
-		
-		// 준비완료 버튼 활성화
-		btnReady.setEnabled(true);
-		lblStatus.setText(pokemonNames[pokemonNum - 1] + " 선택됨");
-		
-		// 포켓몬 선택 정보는 준비완료 버튼을 눌렀을 때 서버로 전송
+		selectionLocked = true; // 이후 다른 볼은 반응하지 않음
+		// stop any preview/timers that might still be running
+		stopRandomPreview();
+		if (animTimer != null && animTimer.isRunning()) animTimer.stop();
+		// 즉시 서버에 준비 상태 전송
+		sendReady();
+			// 모든 몬스터볼 비활성화(선택 고정)
+			if (btnPokemon1 != null) {
+				btnPokemon1.setDisabledIcon((ImageIcon)btnPokemon1.getIcon());
+				btnPokemon1.setEnabled(false);
+			}
+			if (btnPokemon2 != null) {
+				btnPokemon2.setDisabledIcon((ImageIcon)btnPokemon2.getIcon());
+				btnPokemon2.setEnabled(false);
+			}
+			if (btnPokemon3 != null) {
+				btnPokemon3.setDisabledIcon((ImageIcon)btnPokemon3.getIcon());
+				btnPokemon3.setEnabled(false);
+			}
+			if (btnPokemon4 != null) {
+				btnPokemon4.setDisabledIcon((ImageIcon)btnPokemon4.getIcon());
+				btnPokemon4.setEnabled(false);
+			}
+		// lblCenter를 선택 상태 이미지로 교체
+		try {
+			ImageIcon rawCenter = new ImageIcon("Images/pnl_select.png");
+			int cw = lblCenter.getWidth();
+			int ch = lblCenter.getHeight();
+			java.awt.Image cimg = rawCenter.getImage().getScaledInstance(cw, ch, java.awt.Image.SCALE_SMOOTH);
+			lblCenter.setIcon(new ImageIcon(cimg));
+		} catch (Exception ex) {
+			// 실패해도 무시
+		}
+		// 선택한 포켓몬의 전면 이미지를 계속 표시
+		showPreviewFor(pokemonNum);
+		// 다른 hover 플래그 제거
+		hover1 = (pokemonNum == 1);
+		hover2 = (pokemonNum == 2);
+		hover3 = (pokemonNum == 3);
+		hover4 = false;
+		// overlay 숨김
+		hideSelectOverlay();
 	}
 	
 	private void sendReady() {
@@ -218,9 +603,10 @@ public class JplWaitingRoom extends JPanel {
 				String pokemonName = pokemonNames[selectedPokemon - 1];
 				dos.writeUTF("/ready " + pokemonName);
 				myReady = true;
-				btnReady.setEnabled(false);
-				lblMyStatus.setText("나: 준비완료 (" + pokemonName + ")");
-				lblStatus.setText("준비완료! 상대방을 기다리는 중...");
+				// btnReady 제거됨
+				lblMyStatus.setText("■ " + username + "(나): 포켓몬 선택 완료");
+				lblMyStatus.setForeground(new Color(0, 190, 0)); // 초록
+				startStatusTyping(pokemonName + "(이)가 당신의 파트너로 선택 되었습니다.");
 			}
 		} catch (IOException e) {
 			JOptionPane.showMessageDialog(this,
@@ -230,92 +616,49 @@ public class JplWaitingRoom extends JPanel {
 		}
 	}
 	
-	private void sendStart() {
-		try {
-			if (dos != null) {
-				dos.writeUTF("/start");
-			}
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(this,
-					"서버 통신 오류: " + e.getMessage(),
-					"통신 오류", JOptionPane.ERROR_MESSAGE);
-			e.printStackTrace();
-		}
-	}
+	// sendStart removed — server will control game start via /start_game
 	
 	public void handleServerMessage(String message) {
-		// 서버로부터 받은 메시지 처리
+		// 서버로부터 받은 메시지 처리 (새 프로토콜)
 		message = message.trim();
-		
-		if (message.startsWith("/opponent_info")) {
-			// 서버가 기존 참가자 정보를 알려줌
-			String[] parts = message.split(" ", 4);
-			if (parts.length >= 3) {
-				opponentName = parts[1];
-				String status = parts[2];
-				String pokemon = (parts.length >= 4) ? parts[3] : "-";
-				if ("ready".equalsIgnoreCase(status)) {
-					opponentReady = true;
-					if (!pokemon.equals("-")) {
-						lblOpponentStatus.setText("상대방: 준비완료 (" + pokemon + ")");
-					} else {
-						lblOpponentStatus.setText("상대방: 준비완료");
-					}
-				} else {
-					opponentReady = false;
-					if (!pokemon.equals("-")) {
-						lblOpponentStatus.setText("상대방: " + opponentName + " (선택: " + pokemon + ")");
-					} else {
-						lblOpponentStatus.setText("상대방: " + opponentName + " (대기중)");
-					}
-				}
-			}
-		} else if (message.startsWith("[")) {
-			// 일반 채팅 메시지 (입장/퇴장 등)
-			if (message.contains("입장")) {
-				// 상대방 입장 메시지 파싱
-				int startIdx = message.indexOf("[");
-				int endIdx = message.indexOf("]");
-				if (startIdx != -1 && endIdx != -1) {
-					String name = message.substring(startIdx + 1, endIdx);
-					if (!name.equals(username)) {
-						opponentName = name;
-						lblOpponentStatus.setText("상대방: " + opponentName + " (대기중)");
-					}
-				}
-			} else if (message.contains("퇴장")) {
-				opponentReady = false;
-				lblOpponentStatus.setText("상대방: 퇴장");
-				btnStart.setEnabled(false);
-			} else if (message.contains("선택했습니다") || message.contains("선택하였습니다")) {
-				// 상대방 포켓몬 선택 메시지 파싱
-				int startIdx = message.indexOf("[");
-				int endIdx = message.indexOf("]");
-				if (startIdx != -1 && endIdx != -1) {
-					String name = message.substring(startIdx + 1, endIdx);
-					if (!name.equals(username)) {
-						// 상대방이 포켓몬을 선택했다는 정보 표시
-						lblOpponentStatus.setText("상대방: " + name + " (포켓몬 선택 완료)");
-					}
-				}
-			}
-		} else if (message.startsWith("/opponent_ready")) {
-			// 상대방 준비완료
-			opponentReady = true;
-			// 포켓몬 정보도 함께 받기
-			String[] parts = message.split(" ");
+
+		// 1) 상대방 접속: "/opponent_join <name>"
+		if (message.startsWith("/opponent_join ")) {
+			String[] parts = message.split(" ", 2);
 			if (parts.length >= 2) {
-				String opponentPokemon = parts[1].trim();
-				lblOpponentStatus.setText("상대방: 준비완료 (" + opponentPokemon + ")");
-			} else {
-				lblOpponentStatus.setText("상대방: " + opponentName + " (준비완료)");
+				opponentName = parts[1].trim();
+				opponentReady = false;
+				lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택중");
+				lblOpponentStatus.setForeground(new Color(245, 245, 220));
 			}
-			
-			// 양쪽 모두 준비완료면 게임 시작 버튼 활성화
-			if (myReady && opponentReady) {
-				btnStart.setEnabled(true);
-				lblStatus.setText("양쪽 모두 준비완료! 게임을 시작할 수 있습니다.");
+
+		// 2) 상대방 포켓몬 고름: "/opponent_select <name>"
+		} else if (message.startsWith("/opponent_select ")) {
+			String[] parts = message.split(" ", 2);
+			if (parts.length >= 2) {
+				opponentName = parts[1].trim();
+				opponentReady = true;
+				lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
+				lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
+				if (myReady && opponentReady) {
+					startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+				}
 			}
+
+		// 3) 제한시간 숫자: "/time <seconds>" -> 우상단 라벨 업데이트
+		} else if (message.startsWith("/time ")) {
+			String[] parts = message.split(" ", 2);
+			if (parts.length >= 2) {
+				String t = parts[1].trim();
+				try {
+					Integer.parseInt(t); // validate numeric
+					lblTimer.setText(t);
+				} catch (NumberFormatException ex) {
+					// ignore invalid
+				}
+			}
+
+		// 4) 게임 시작 신호
 		} else if (message.startsWith("/start_game")) {
 			// 게임 시작 신호 (서버에서 보냄)
 			// TODO: 게임 화면으로 전환

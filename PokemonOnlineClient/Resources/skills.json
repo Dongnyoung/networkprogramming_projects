@@ -1,0 +1,7 @@
+[
+  { "id": "scratch", "koreanName": "할퀴기", "type": "NORMAL", "power": 40, "accuracy": 1.0 },
+  { "id": "ember", "koreanName": "불꽃세례", "type": "FIRE", "power": 40, "accuracy": 0.95 },
+  { "id": "tackle", "koreanName": "몸통박치기", "type": "NORMAL", "power": 40, "accuracy": 1.0 },
+  { "id": "watergun", "koreanName": "물대포", "type": "WATER", "power": 40, "accuracy": 0.95 },
+  { "id": "vinewhip", "koreanName": "덩굴채찍", "type": "GRASS", "power": 45, "accuracy": 0.95 }
+]
