@@ -619,55 +619,131 @@ public class JplWaitingRoom extends JPanel {
 	// sendStart removed — server will control game start via /start_game
 	
 	public void handleServerMessage(String message) {
-		// 서버로부터 받은 메시지 처리 (새 프로토콜)
-		message = message.trim();
+	    // 서버로부터 받은 메시지 처리
+	    message = message.trim();
+	    System.out.println("[DEBUG from server] '" + message + "'");
 
-		// 1) 상대방 접속: "/opponent_join <name>"
-		if (message.startsWith("/opponent_join ")) {
-			String[] parts = message.split(" ", 2);
-			if (parts.length >= 2) {
-				opponentName = parts[1].trim();
-				opponentReady = false;
-				lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택중");
-				lblOpponentStatus.setForeground(new Color(245, 245, 220));
-			}
+	    // 0) 입장 브로드캐스트: "[이름]님이 입장 하였습니다."
+	    if (message.startsWith("[") && message.contains("님이 입장 하였습니다.")) {
+	        int left = message.indexOf('[');
+	        int right = message.indexOf(']');
 
-		// 2) 상대방 포켓몬 고름: "/opponent_select <name>"
-		} else if (message.startsWith("/opponent_select ")) {
-			String[] parts = message.split(" ", 2);
-			if (parts.length >= 2) {
-				opponentName = parts[1].trim();
-				opponentReady = true;
-				lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
-				lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
-				if (myReady && opponentReady) {
-					startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
-				}
-			}
+	        if (left >= 0 && right > left) {
+	            String name = message.substring(left + 1, right).trim();
 
-		// 3) 제한시간 숫자: "/time <seconds>" -> 우상단 라벨 업데이트
-		} else if (message.startsWith("/time ")) {
-			String[] parts = message.split(" ", 2);
-			if (parts.length >= 2) {
-				String t = parts[1].trim();
-				try {
-					Integer.parseInt(t); // validate numeric
-					lblTimer.setText(t);
-				} catch (NumberFormatException ex) {
-					// ignore invalid
-				}
-			}
+	            // 나 자신이면 상대로 취급 X
+	            if (!name.equals(username)) {
+	                opponentName = name;
+	                opponentReady = false;
 
-		// 4) 게임 시작 신호
-		} else if (message.startsWith("/start_game")) {
-			// 게임 시작 신호 (서버에서 보냄)
-			// TODO: 게임 화면으로 전환
-			JOptionPane.showMessageDialog(this,
-					"게임을 시작합니다!",
-					"게임 시작", JOptionPane.INFORMATION_MESSAGE);
-		}
+	                lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택중");
+	                lblOpponentStatus.setForeground(new Color(245, 245, 220)); // 베이지
+	            }
+	        }
+	        return;
+	    }
+
+	    // 1) 기존 접속자 / 상태 동기화
+	    //    형식: /opponent_info <name> <status> <pokemon or "-">
+	    if (message.startsWith("/opponent_info ")) {
+	        String[] parts = message.split("\\s+");
+	        if (parts.length >= 3) {
+	            String name   = parts[1].trim();
+	            String status = parts[2].trim();
+	            // parts[3] 에 포켓몬이 올 수 있지만, 화면에는 쓰지 않음.
+
+	            // 자기 자신이면 무시
+	            if (name.equals(username)) return;
+
+	            opponentName = name;
+
+	            if ("ready".equalsIgnoreCase(status)) {
+	                opponentReady = true;
+	                lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
+	                lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
+	                if (myReady && opponentReady) {
+	                    startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	                }
+	            } else {
+	                opponentReady = false;
+	                lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택중");
+	                lblOpponentStatus.setForeground(new Color(245, 245, 220)); // 베이지
+	            }
+	        }
+	        return;
+	    }
+
+	    // 2) 상대 준비완료 신호
+	    //    형식: /opponent_ready 파이리
+	    //    → 포켓몬 이름은 무시하고, 이름만 상태에 사용
+	    if (message.startsWith("/opponent_ready")) {
+	        opponentReady = true;
+
+	        String displayName = (opponentName == null || opponentName.isBlank())
+	                ? "상대"
+	                : opponentName;
+
+	        lblOpponentStatus.setText("■ " + displayName + ": 선택 완료");
+	        lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
+
+	        if (myReady && opponentReady) {
+	            startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	        }
+	        return;
+	    }
+
+	    // 3) 브로드캐스트 형식 준비완료:
+	    //    [dong]님이 준비완료했습니다. (포켓몬: 파이리)
+	    //    → 여기서도 포켓몬은 무시하고, 이름만 상태에 사용
+	    if (message.startsWith("[") && message.contains("님이 준비완료했습니다.")) {
+	        int left = message.indexOf('[');
+	        int right = message.indexOf(']');
+	        if (left >= 0 && right > left) {
+	            String name = message.substring(left + 1, right).trim();
+
+	            // 내 이름이면 무시
+	            if (name.equals(username)) return;
+
+	            opponentName = name;
+	            opponentReady = true;
+
+	            lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
+	            lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
+
+	            if (myReady && opponentReady) {
+	                startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	            }
+	        }
+	        return;
+	    }
+
+	    // 4) 제한시간 숫자: "/time <seconds>" -> 우상단 라벨 업데이트
+	    if (message.startsWith("/time ")) {
+	        String[] parts = message.split(" ", 2);
+	        if (parts.length >= 2) {
+	            String t = parts[1].trim();
+	            try {
+	                Integer.parseInt(t); // 숫자인지만 체크
+	                lblTimer.setText(t);
+	            } catch (NumberFormatException ex) {
+	                // 무시
+	            }
+	        }
+	        return;
+	    }
+
+	    // 5) 게임 시작 신호
+	    if (message.startsWith("/start_game")) {
+	        JOptionPane.showMessageDialog(this,
+	                "게임을 시작합니다!",
+	                "게임 시작", JOptionPane.INFORMATION_MESSAGE);
+	        return;
+	    }
+
+	    // 그 외 메시지 (로그용)
+	    System.out.println("[INFO] Unhandled message: " + message);
 	}
-	
+
 	public void disconnect() {
 		try {
 			if (dos != null) {

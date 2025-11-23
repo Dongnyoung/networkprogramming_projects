@@ -49,7 +49,10 @@ public class UserService extends Thread {
                         (existing.selectedPokemon == null || existing.selectedPokemon.isEmpty())
                                 ? "-" : existing.selectedPokemon;
                 WriteOne("/opponent_info " + existing.UserName + " " + status + " " + pokemonInfo + "\n");
+                existing.WriteOne("/opponent_info " + UserName + " waiting -\n");
+
             }
+            
 
             String br_msg = "[" + UserName + "]님이 입장 하였습니다.\n";
             WriteAll(br_msg); // 아직 user_vc에 본인은 포함되지 않음
