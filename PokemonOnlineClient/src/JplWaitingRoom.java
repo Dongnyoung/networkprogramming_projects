@@ -60,6 +60,12 @@ public class JplWaitingRoom extends JPanel {
 	// 우상단 남은시간 라벨
 	private JLabel lblTimer;
 
+	private Timer waitingTimer;
+	private int waitingSeconds =15;
+	
+	private Timer startCountdownTimer;
+	private int startCountdown=0;
+	
 	// 상태 라벨 타이핑 애니메이션
 	private Timer statusTypingTimer;
 	private int typingIndex = 0;
@@ -240,7 +246,31 @@ public class JplWaitingRoom extends JPanel {
 		int tx = Math.max(0, w - 90);
 		lblTimer.setBounds(tx, 20, 100, 50);
 		lblTimer.setOpaque(false);
+		
+		waitingSeconds = 15;
+		lblTimer.setText(String.valueOf(waitingSeconds));
+		waitingTimer = new Timer(1000, e -> {
+		    // 이미 둘 다 ready 되면 대기 타이머는 의미 없으니 정지
+		    if (myReady && opponentReady) {
+		        ((Timer) e.getSource()).stop();
+		        return;
+		    }
+		    if(myReady) {
+		    	((Timer) e.getSource()).stop();
+		        return;
+		    }
 
+		    waitingSeconds--;
+		    if (waitingSeconds <= 0) {
+		        waitingSeconds = 0;
+		        lblTimer.setText("0");
+		        ((Timer) e.getSource()).stop();
+		        // TODO: 여기서 시간초과 처리 하고 싶으면 메시지 띄우거나, 랜덤 자동선택 등 추가 가능
+		    } else {
+		        lblTimer.setText(String.valueOf(waitingSeconds));
+		    }
+		});
+		waitingTimer.start();
 		// 중앙에 표시할 이미지 라벨 (pnl_unselect.png)
 		int cw = 244, ch = 244; // 중앙 라벨 크기
 		int cx = Math.max(0, (w - cw) / 2);
@@ -643,14 +673,12 @@ public class JplWaitingRoom extends JPanel {
 	        return;
 	    }
 
-	    // 1) 기존 접속자 / 상태 동기화
-	    //    형식: /opponent_info <name> <status> <pokemon or "-">
 	    if (message.startsWith("/opponent_info ")) {
 	        String[] parts = message.split("\\s+");
 	        if (parts.length >= 3) {
 	            String name   = parts[1].trim();
 	            String status = parts[2].trim();
-	            // parts[3] 에 포켓몬이 올 수 있지만, 화면에는 쓰지 않음.
+	            //포켓몬은 안보
 
 	            // 자기 자신이면 무시
 	            if (name.equals(username)) return;
@@ -662,7 +690,7 @@ public class JplWaitingRoom extends JPanel {
 	                lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
 	                lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 	                if (myReady && opponentReady) {
-	                    startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	                    onBothReady();
 	                }
 	            } else {
 	                opponentReady = false;
@@ -674,8 +702,7 @@ public class JplWaitingRoom extends JPanel {
 	    }
 
 	    // 2) 상대 준비완료 신호
-	    //    형식: /opponent_ready 파이리
-	    //    → 포켓몬 이름은 무시하고, 이름만 상태에 사용
+	    //  이름만 상태에 적
 	    if (message.startsWith("/opponent_ready")) {
 	        opponentReady = true;
 
@@ -687,14 +714,13 @@ public class JplWaitingRoom extends JPanel {
 	        lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 
 	        if (myReady && opponentReady) {
-	            startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	            onBothReady();
 	        }
 	        return;
 	    }
 
 	    // 3) 브로드캐스트 형식 준비완료:
-	    //    [dong]님이 준비완료했습니다. (포켓몬: 파이리)
-	    //    → 여기서도 포켓몬은 무시하고, 이름만 상태에 사용
+	    //    여기서도 포켓몬 이름은 적용 안
 	    if (message.startsWith("[") && message.contains("님이 준비완료했습니다.")) {
 	        int left = message.indexOf('[');
 	        int right = message.indexOf(']');
@@ -711,7 +737,7 @@ public class JplWaitingRoom extends JPanel {
 	            lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 
 	            if (myReady && opponentReady) {
-	                startStatusTyping("양쪽 모두 준비완료! 서버에서 게임을 시작합니다...");
+	            	onBothReady();
 	            }
 	        }
 	        return;
@@ -734,9 +760,7 @@ public class JplWaitingRoom extends JPanel {
 
 	    // 5) 게임 시작 신호
 	    if (message.startsWith("/start_game")) {
-	        JOptionPane.showMessageDialog(this,
-	                "게임을 시작합니다!",
-	                "게임 시작", JOptionPane.INFORMATION_MESSAGE);
+	    	startGameCountdown();
 	        return;
 	    }
 
@@ -794,6 +818,57 @@ public class JplWaitingRoom extends JPanel {
 	@Override
 	public Dimension getPreferredSize() {
 		return new Dimension(w, h);
+	}
+	private void onBothReady() {
+	    // 여기서는 그냥 라벨/문구만…
+	    stopStatusTyping();
+	    startStatusTyping("양쪽 모두 준비완료! 서버에서 시작 신호를 기다리는 중...");
+	}
+
+	private void startGameCountdown() {
+	    // 이미 카운트다운 중이면 중복 시작 방지
+	    if (startCountdownTimer != null && startCountdownTimer.isRunning()) {
+	        return;
+	    }
+
+	    // 혹시 15초 대기 타이머가 아직 살아 있으면 정지
+	    if (waitingTimer != null && waitingTimer.isRunning()) {
+	        waitingTimer.stop();
+	    }
+
+	    // 상태 문구 갱신
+	    stopStatusTyping();
+	    startStatusTyping("양쪽 모두 준비완료! 3초 후에 게임을 시작합니다...");
+
+	    // 3초부터 시작
+	    startCountdown = 3;
+	    lblTimer.setText(String.valueOf(startCountdown));
+
+	    startCountdownTimer = new Timer(1000, e -> {
+	        startCountdown--;
+
+	        if (startCountdown <= 0) {
+	            startCountdownTimer.stop();
+	            lblTimer.setText("0");
+
+	            // 여기서 실제 배틀 화면으로 넘어가면 됨
+	            JOptionPane.showMessageDialog(
+	                    JplWaitingRoom.this,
+	                    "게임을 시작합니다!",
+	                    "게임 시작",
+	                    JOptionPane.INFORMATION_MESSAGE
+	            );
+	            // TODO: 부모 프레임에 알려서 배틀 패널로 전환 같은 거 수행
+	            // ex) mainFrame.showBattlePanel(...);
+
+	        } else {
+	            lblTimer.setText(String.valueOf(startCountdown));
+	        }
+	    });
+
+	    // 1초 뒤에 첫 감소(3을 1초 보여주고 → 2 → 1 → 0)
+	    startCountdownTimer.setInitialDelay(1000);
+	    startCountdownTimer.start();
 	}
 }
 
