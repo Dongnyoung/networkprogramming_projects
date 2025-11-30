@@ -1,1 +1,33 @@
+# ──────────────── Java & JAR ────────────────
+*.class
+*.jar
+*.war
+*.ear
+
+# ──────────────── 빌드 출력물(꼭!) ────────────────
+bin/
+out/
+target/
+build/
+
+# ──────────────── IDE 환경 ────────────────
+# Eclipse
+.classpath
+.project
+.settings/
+
+# IntelliJ
+.idea/
+*.iml
+
+# VSCode
+.vscode/
+
+# ──────────────── 캐시/로그 ────────────────
+*.log
+.DS_Store
+
+# ──────────────── 이미지/리소스는 놔두고 ────────────────
+!Images/
+
 .metadata/
