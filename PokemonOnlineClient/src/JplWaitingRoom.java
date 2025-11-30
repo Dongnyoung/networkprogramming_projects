@@ -92,8 +92,11 @@ public class JplWaitingRoom extends JPanel {
 	// 선택 확정 상태
 	private boolean selectionLocked = false;
 	
-	public JplWaitingRoom(String username, String ip, String port) {
+	private BattleStartListener battleStartListener;
+	
+	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener) {
 		this.username = username;
+		this.battleStartListener = battleStartListener;
 		setLayout(null);
 		
 		// 배경 이미지 로드
@@ -851,16 +854,13 @@ public class JplWaitingRoom extends JPanel {
 	            startCountdownTimer.stop();
 	            lblTimer.setText("0");
 
-	            // 여기서 실제 배틀 화면으로 넘어가면 됨
-	            JOptionPane.showMessageDialog(
-	                    JplWaitingRoom.this,
-	                    "게임을 시작합니다!",
-	                    "게임 시작",
-	                    JOptionPane.INFORMATION_MESSAGE
-	            );
-	            // TODO: 부모 프레임에 알려서 배틀 패널로 전환 같은 거 수행
-	            // ex) mainFrame.showBattlePanel(...);
-
+	            if (battleStartListener != null) {
+	            	String myPokemonId = null;
+	                if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
+	                    myPokemonId = pokemonIds[selectedPokemon - 1];
+	                }
+	            	battleStartListener.onBattleStartRequest(myPokemonId, opponentName, socket, dis, dos ); 
+	            }
 	        } else {
 	            lblTimer.setText(String.valueOf(startCountdown));
 	        }
