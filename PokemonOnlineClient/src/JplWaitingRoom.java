@@ -258,22 +258,23 @@ public class JplWaitingRoom extends JPanel {
 		        ((Timer) e.getSource()).stop();
 		        return;
 		    }
-		    if(myReady) {
-		    	((Timer) e.getSource()).stop();
-		        return;
-		    }
 
 		    waitingSeconds--;
 		    if (waitingSeconds <= 0) {
 		        waitingSeconds = 0;
 		        lblTimer.setText("0");
 		        ((Timer) e.getSource()).stop();
-		        // TODO: 여기서 시간초과 처리 하고 싶으면 메시지 띄우거나, 랜덤 자동선택 등 추가 가능
+		        
+		        // 시간 초과: 아직 선택 안 했으면 랜덤 강제 선택
+		        if (!myReady && selectedPokemon == 0) {
+		            int randomChoice = (int)(Math.random() * 3) + 1; // 1, 2, 3 중 랜덤
+		            selectPokemon(randomChoice);
+		        }
 		    } else {
 		        lblTimer.setText(String.valueOf(waitingSeconds));
 		    }
 		});
-		waitingTimer.start();
+		// 타이머는 상대가 들어올 때 시작 (자동 시작 X)
 		// 중앙에 표시할 이미지 라벨 (pnl_unselect.png)
 		int cw = 244, ch = 244; // 중앙 라벨 크기
 		int cx = Math.max(0, (w - cw) / 2);
@@ -688,9 +689,14 @@ public class JplWaitingRoom extends JPanel {
 
 	            opponentName = name;
 
+	            // 상대방 정보를 받았다 = 2명이 된 것 -> 15초 타이머 시작
+	            if (waitingTimer != null && !waitingTimer.isRunning() && !myReady) {
+	                waitingTimer.start();
+	            }
+
 	            if ("ready".equalsIgnoreCase(status)) {
 	                opponentReady = true;
-	                lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
+	                lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택 완료");
 	                lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 	                if (myReady && opponentReady) {
 	                    onBothReady();
@@ -713,7 +719,7 @@ public class JplWaitingRoom extends JPanel {
 	                ? "상대"
 	                : opponentName;
 
-	        lblOpponentStatus.setText("■ " + displayName + ": 선택 완료");
+	        lblOpponentStatus.setText("■ " + displayName + ": 포켓몬 선택 완료");
 	        lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 
 	        if (myReady && opponentReady) {
@@ -736,7 +742,7 @@ public class JplWaitingRoom extends JPanel {
 	            opponentName = name;
 	            opponentReady = true;
 
-	            lblOpponentStatus.setText("■ " + opponentName + ": 선택 완료");
+	            lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택 완료");
 	            lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 
 	            if (myReady && opponentReady) {
@@ -832,11 +838,6 @@ public class JplWaitingRoom extends JPanel {
 	    // 이미 카운트다운 중이면 중복 시작 방지
 	    if (startCountdownTimer != null && startCountdownTimer.isRunning()) {
 	        return;
-	    }
-
-	    // 혹시 15초 대기 타이머가 아직 살아 있으면 정지
-	    if (waitingTimer != null && waitingTimer.isRunning()) {
-	        waitingTimer.stop();
 	    }
 
 	    // 상태 문구 갱신

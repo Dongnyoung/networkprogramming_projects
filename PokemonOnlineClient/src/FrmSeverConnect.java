@@ -87,33 +87,6 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
 
     // (이전의 Auto 버튼 처리 코드는 제거됨)
 
-    // 네트워크 인터페이스에서 IPv4 주소들을 수집
-    private List<String> getLocalIPv4Addresses() {
-        List<String> results = new ArrayList<>();
-        try {
-            Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
-            while (nets.hasMoreElements()) {
-                NetworkInterface ni = nets.nextElement();
-                try {
-                    if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
-                } catch (Exception ex) {
-                    continue;
-                }
-                Enumeration<InetAddress> addrs = ni.getInetAddresses();
-                while (addrs.hasMoreElements()) {
-                    InetAddress addr = addrs.nextElement();
-                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress() && !addr.isLinkLocalAddress()) {
-                        String ip = addr.getHostAddress();
-                        results.add(ip);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 무시하고 빈 리스트 반환
-        }
-        return results;
-    }
-
     // 선호 로컬 IPv4를 결정: 우선 순위 -> Wi-Fi/Ethernet(이름에 wifi/wlan/wi/eth/ethernet 포함), site-local, 그 외
     private String getPreferredLocalIPv4() {
         try {
