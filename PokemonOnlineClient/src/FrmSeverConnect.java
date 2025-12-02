@@ -6,6 +6,8 @@ import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -30,8 +32,9 @@ import javax.swing.text.AbstractDocument;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.SwingUtilities;
 
-public class FrmSeverConnect extends JFrame {
+public class FrmSeverConnect extends JFrame implements BattleStartListener{
 
     private static final long serialVersionUID = 1L;
 
@@ -513,7 +516,7 @@ public class FrmSeverConnect extends JFrame {
 
                     if (ok) {
                         // 연결 성공: 대기실로 전환
-                        waitingPanel = new JplWaitingRoom(username, ip, port);
+                        waitingPanel = new JplWaitingRoom(username, ip, port, FrmSeverConnect.this);
                         setContentPane(waitingPanel);
                         pack();
                         setLocationRelativeTo(null);
@@ -531,4 +534,55 @@ public class FrmSeverConnect extends JFrame {
          
         }
     }
+
+    @Override
+    public void onBattleStartRequest(String myPokemonId,
+                                     String opponentName,
+                                     Socket socket,
+                                     DataInputStream dis,
+                                     DataOutputStream dos) {
+
+        System.out.println("[DEBUG] 배틀 시작 요청: selectedPokemon="
+                + myPokemonId + ", opponent=" + opponentName);
+
+        Pokemon myPokemon = PokemonRepository.getInstance().getById(myPokemonId);
+        if (myPokemon == null) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "선택한 포켓몬 데이터를 찾을 수 없습니다: " + myPokemonId,
+                    "데이터 오류",
+                    JOptionPane.ERROR_MESSAGE
+            );
+            return;
+        }
+        // 1) 몬스터볼 연출 패널 생성
+        JplBallTransition transitionPanel = new JplBallTransition(() -> {
+            // 이 Runnable은 "연출이 완전히 끝난 뒤"에 호출됨
+
+            // 2) 여기서 배틀 패널 생성 후 화면 전환
+            SwingUtilities.invokeLater(() -> {
+                JplBattlePanel battlePanel = new JplBattlePanel(
+                        myPokemon,
+                        opponentName,
+                        socket,
+                        dis,
+                        dos
+                );
+
+                setContentPane(battlePanel);
+                //pack();
+                setLocationRelativeTo(null);
+                revalidate();
+                repaint();
+            });
+        });
+
+        // 3) 현재 프레임 내용물을 연출 패널로 교체
+        setContentPane(transitionPanel);
+        //pack();
+        setLocationRelativeTo(null);
+        revalidate();
+        repaint();
+    }
+
 }
