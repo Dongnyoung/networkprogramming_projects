@@ -38,8 +38,6 @@ public class UserService extends Thread {
             UserName = msg[1].trim();
 
             server.AppendText("새로운 참가자 " + UserName + " 입장.");
-            WriteOne("Welcome to Java chat server\n");
-            WriteOne(UserName + "님 환영합니다.\n");
 
             // 이미 접속 중인 사용자 정보를 새 참가자에게 전달
             for (int i = 0; i < user_vc.size(); i++) {
@@ -193,15 +191,6 @@ public class UserService extends Thread {
                         if (allUsersReady()) {
                             WriteAll("/start_game\n");
                             server.AppendText("모든 사용자가 준비완료! 게임을 시작합니다.");
-                        }
-                        break;
-
-                    case "/start": // 게임 시작 요청
-                        if (allUsersReady()) {
-                            WriteAll("/start_game\n");
-                            server.AppendText(UserName + "님이 게임 시작을 요청했습니다. 게임을 시작합니다.");
-                        } else {
-                            WriteOne("아직 모든 사용자가 준비완료되지 않았습니다.\n");
                         }
                         break;
 
