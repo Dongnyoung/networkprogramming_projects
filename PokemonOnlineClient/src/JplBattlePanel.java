@@ -71,7 +71,10 @@ public class JplBattlePanel extends JPanel {
 
     private void loadBackground() {
         try {
-            bg = new ImageIcon("Images/bg_battle.png").getImage();
+            int n = 1 + (int)(Math.random() * 4);  // 1~4 랜덤
+            String path = "Images/bg_arena" + n + ".png";
+
+            bg = new ImageIcon(path).getImage();
         } catch (Exception e) {
             bg = null;
         }
@@ -107,11 +110,11 @@ public class JplBattlePanel extends JPanel {
         if (myBackImg == null) return;
 
         // 아래 왼쪽 근처가 타겟
-        myTargetX = 80;
-        myTargetY = PANEL_H - myImgH - 100;
+        myTargetX =120;
+        myTargetY = PANEL_H - myImgH - 210;
 
-        // 시작 위치: 화면 왼쪽 밖
-        myX = -myImgW;
+        // 시작 위치: 화면 "오른쪽" 밖
+        myX = PANEL_W+20;          // 또는 PANEL_W + 100 정도
         myY = myTargetY;
 
         animMy = true;
@@ -123,11 +126,11 @@ public class JplBattlePanel extends JPanel {
         if (enemyFrontImg == null) return;
 
         // 위 오른쪽 근처가 타겟
-        enemyTargetX = PANEL_W - enemyImgW - 80;
-        enemyTargetY = 120;
+        enemyTargetX = PANEL_W - enemyImgW - 160;
+        enemyTargetY = 80;
 
-        // 시작 위치: 화면 오른쪽 밖
-        enemyX = PANEL_W;
+        // 시작 위치: 화면 "왼쪽" 밖
+        enemyX = -enemyImgW;    // 또는 -200 같은 값
         enemyY = enemyTargetY;
 
         animEnemy = true;
@@ -139,7 +142,7 @@ public class JplBattlePanel extends JPanel {
         if (entryTimer != null && entryTimer.isRunning()) return;
 
         int delay = 16;   // ~60fps
-        int speed = 30;   // 한 프레임 이동량
+        int speed = 20;   // 한 프레임 이동량
 
         entryTimer = new Timer(delay, e -> {
             boolean doneMy = !animMy;
@@ -147,9 +150,9 @@ public class JplBattlePanel extends JPanel {
 
             // 내 포켓몬 슬라이드
             if (animMy && myBackImg != null) {
-                if (myX < myTargetX) {
-                    myX += speed;
-                    if (myX > myTargetX) myX = myTargetX;
+                if (myX > myTargetX) {
+                    myX -= speed;
+                    if (myX < myTargetX) myX = myTargetX;
                 }
                 if (myX == myTargetX) {
                     animMy = false;
@@ -159,9 +162,9 @@ public class JplBattlePanel extends JPanel {
 
             // 상대 포켓몬 슬라이드
             if (animEnemy && enemyFrontImg != null) {
-                if (enemyX > enemyTargetX) {
-                    enemyX -= speed;
-                    if (enemyX < enemyTargetX) enemyX = enemyTargetX;
+                if (enemyX < enemyTargetX) {
+                    enemyX += speed;
+                    if (enemyX > enemyTargetX) enemyX = enemyTargetX;
                 }
                 if (enemyX == enemyTargetX) {
                     animEnemy = false;
@@ -172,6 +175,7 @@ public class JplBattlePanel extends JPanel {
             if (doneMy && doneEnemy) {
                 entryTimer.stop();
                 // 여기서 스킬 버튼 활성화 같은 “전투 준비 완료” 처리
+                
             }
 
             repaint();
@@ -217,16 +221,19 @@ public class JplBattlePanel extends JPanel {
     }
 
     private void drawStatusBars(Graphics2D g2) {
-        // 내 포켓몬 상태바
+
         if (myPokemon != null) {
-            int barX = 40;
-            int barY = 30;
             int barW = 260;
             int barH = 20;
 
+            //  내 포켓몬 오른쪽에 배치
+            int barX = myX + myImgW + 150;
+            int barY = myY;   // 살짝 위로
+
             g2.setColor(Color.WHITE);
             g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
-            g2.drawString(myPokemon.getKoreanName() + " Lv." + myPokemon.getLevel(), barX, barY - 8);
+            g2.drawString(myPokemon.getKoreanName() + " Lv." + myPokemon.getLevel(),
+                          barX, barY - 8);
 
             int maxHp = myPokemon.calcMaxHp();
             int curHp = myPokemon.getCurrentHp();
@@ -235,24 +242,24 @@ public class JplBattlePanel extends JPanel {
             g2.setColor(Color.DARK_GRAY);
             g2.fillRoundRect(barX, barY, barW, barH, 10, 10);
 
-            int hpW = (int) (barW * ratio);
+            int hpW = (int)(barW * ratio);
             g2.setColor(new Color(80, 220, 80));
             g2.fillRoundRect(barX, barY, hpW, barH, 10, 10);
         }
 
-        // 상대 포켓몬 상태바
+        
         if (enemyPokemon != null) {
             int barW = 260;
             int barH = 20;
-            int barX = PANEL_W - barW - 40;
-            int barY = 30;
+
+            // 상대 포켓몬 왼쪽에 배치
+            int barX = enemyX - barW - 50;
+            int barY = enemyY + 20;
 
             g2.setColor(Color.WHITE);
             g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
-            g2.drawString(
-                    enemyPokemon.getKoreanName() + " Lv." + enemyPokemon.getLevel(),
-                    barX, barY - 8
-            );
+            g2.drawString(enemyPokemon.getKoreanName() + " Lv." + enemyPokemon.getLevel(),
+                          barX, barY - 8);
 
             int maxHp = enemyPokemon.calcMaxHp();
             int curHp = enemyPokemon.getCurrentHp();
@@ -261,18 +268,13 @@ public class JplBattlePanel extends JPanel {
             g2.setColor(Color.DARK_GRAY);
             g2.fillRoundRect(barX, barY, barW, barH, 10, 10);
 
-            int hpW = (int) (barW * ratio);
+            int hpW = (int)(barW * ratio);
             g2.setColor(new Color(220, 80, 80));
             g2.fillRoundRect(barX, barY, hpW, barH, 10, 10);
         }
-
-        // 화면 하단에 “상대: xxx” 정도 텍스트
-        if (opponentName != null) {
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 22));
-            g2.drawString("상대: " + opponentName, 40, PANEL_H - 40);
-        }
     }
+
+
 
     @Override
     public Dimension getPreferredSize() {
