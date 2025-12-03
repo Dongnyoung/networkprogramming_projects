@@ -4,41 +4,278 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 
-//임시버전
 public class JplBattlePanel extends JPanel {
 
-    private Pokemon myPokemon;
-    private String opponentName;
-    private Socket socket;
-    private DataInputStream dis;
-    private DataOutputStream dos;
+    private static final int PANEL_W = 1024;
+    private static final int PANEL_H = 768;
+
+    private final Pokemon myPokemon;
+    private Pokemon enemyPokemon;           // 처음엔 null일 수 있음
+    private final String opponentName;
+    private final Socket socket;
+    private final DataInputStream dis;
+    private final DataOutputStream dos;
+
+    private Image bg;
+
+    // 내 포켓몬(뒷모습) 이미지
+    private Image myBackImg;
+    private int myImgW = 220;
+    private int myImgH = 220;
+
+    // 상대 포켓몬(앞모습) 이미지
+    private Image enemyFrontImg;
+    private int enemyImgW = 220;
+    private int enemyImgH = 220;
+
+    // 현재 좌표 & 타겟 좌표
+    private int myX, myY;
+    private int myTargetX, myTargetY;
+
+    private int enemyX, enemyY;
+    private int enemyTargetX, enemyTargetY;
+
+    private Timer entryTimer;
+    private boolean animMy = false;
+    private boolean animEnemy = false;
 
     public JplBattlePanel(Pokemon myPokemon,
+    					  Pokemon enemyPokemon,
                           String opponentName,
                           Socket socket,
                           DataInputStream dis,
                           DataOutputStream dos) {
 
         this.myPokemon = myPokemon;
+        this.enemyPokemon = enemyPokemon;
         this.opponentName = opponentName;
         this.socket = socket;
         this.dis = dis;
         this.dos = dos;
 
         setBackground(Color.BLACK);
-        setLayout(new BorderLayout());
+        setLayout(null);          // 나중에 스킬 버튼 깔기 편하게
+        setDoubleBuffered(true);
 
-        JLabel label = new JLabel(
-                "<html><body style='text-align:center;'>"
-                        + "배틀 화면!<br/>"
-                        + "내 포켓몬 index: " + myPokemon.getKoreanName() + "<br/>"
-                        + "상대: " + opponentName
-                        + "</body></html>",
-                SwingConstants.CENTER
-        );
-        label.setForeground(Color.WHITE);
-        label.setFont(new Font("PF Stardust Bold", Font.BOLD, 30));
+        loadBackground();
+        loadMyPokemonImage();
+        initMyPositionAndStartAnim();
+        
+        // 상대 포켓몬은 아직 모를 수 있으니 여기서는 안 건드림
+        // 나중에 서버에서 id 받으면 setEnemyPokemon() 호출
+        if (this.enemyPokemon != null) {
+            loadEnemyPokemonImage();
+            initEnemyPositionAndStartAnim();
+        }
+    }
 
-        add(label, BorderLayout.CENTER);
+    private void loadBackground() {
+        try {
+            bg = new ImageIcon("Images/bg_battle.png").getImage();
+        } catch (Exception e) {
+            bg = null;
+        }
+    }
+
+    private void loadMyPokemonImage() {
+        if (myPokemon == null) return;
+        try {
+            String back = myPokemon.getBackImageFile();   // 뒷모습 스프라이트
+            if (back != null) {
+                ImageIcon raw = new ImageIcon(back);
+                myBackImg = raw.getImage().getScaledInstance(myImgW, myImgH, Image.SCALE_SMOOTH);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadEnemyPokemonImage() {
+        if (enemyPokemon == null) return;
+        try {
+            String front = enemyPokemon.getFrontImageFile(); // 앞모습 스프라이트
+            if (front != null) {
+                ImageIcon raw = new ImageIcon(front);
+                enemyFrontImg = raw.getImage().getScaledInstance(enemyImgW, enemyImgH, Image.SCALE_SMOOTH);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void initMyPositionAndStartAnim() {
+        if (myBackImg == null) return;
+
+        // 아래 왼쪽 근처가 타겟
+        myTargetX = 80;
+        myTargetY = PANEL_H - myImgH - 100;
+
+        // 시작 위치: 화면 왼쪽 밖
+        myX = -myImgW;
+        myY = myTargetY;
+
+        animMy = true;
+
+        startEntryTimerIfNeeded();
+    }
+
+    private void initEnemyPositionAndStartAnim() {
+        if (enemyFrontImg == null) return;
+
+        // 위 오른쪽 근처가 타겟
+        enemyTargetX = PANEL_W - enemyImgW - 80;
+        enemyTargetY = 120;
+
+        // 시작 위치: 화면 오른쪽 밖
+        enemyX = PANEL_W;
+        enemyY = enemyTargetY;
+
+        animEnemy = true;
+
+        startEntryTimerIfNeeded();
+    }
+
+    private void startEntryTimerIfNeeded() {
+        if (entryTimer != null && entryTimer.isRunning()) return;
+
+        int delay = 16;   // ~60fps
+        int speed = 30;   // 한 프레임 이동량
+
+        entryTimer = new Timer(delay, e -> {
+            boolean doneMy = !animMy;
+            boolean doneEnemy = !animEnemy;
+
+            // 내 포켓몬 슬라이드
+            if (animMy && myBackImg != null) {
+                if (myX < myTargetX) {
+                    myX += speed;
+                    if (myX > myTargetX) myX = myTargetX;
+                }
+                if (myX == myTargetX) {
+                    animMy = false;
+                    doneMy = true;
+                }
+            }
+
+            // 상대 포켓몬 슬라이드
+            if (animEnemy && enemyFrontImg != null) {
+                if (enemyX > enemyTargetX) {
+                    enemyX -= speed;
+                    if (enemyX < enemyTargetX) enemyX = enemyTargetX;
+                }
+                if (enemyX == enemyTargetX) {
+                    animEnemy = false;
+                    doneEnemy = true;
+                }
+            }
+
+            if (doneMy && doneEnemy) {
+                entryTimer.stop();
+                // 여기서 스킬 버튼 활성화 같은 “전투 준비 완료” 처리
+            }
+
+            repaint();
+        });
+
+        entryTimer.start();
+    }
+
+    /**
+     * 서버에서 상대 포켓몬 id를 받은 후,
+     * FrmSeverConnect 에서 enemyPokemon 만들어서 호출해줄 메소드.
+     */
+    public void setEnemyPokemon(Pokemon enemyPokemon) {
+        this.enemyPokemon = enemyPokemon;
+        loadEnemyPokemonImage();
+        initEnemyPositionAndStartAnim();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        // 배경
+        if (bg != null) {
+            g.drawImage(bg, 0, 0, PANEL_W, PANEL_H, this);
+        } else {
+            g.setColor(new Color(10, 20, 40));
+            g.fillRect(0, 0, PANEL_W, PANEL_H);
+        }
+
+        // 내 포켓몬(뒷모습)
+        if (myBackImg != null) {
+            g.drawImage(myBackImg, myX, myY, this);
+        }
+
+        // 상대 포켓몬(앞모습)
+        if (enemyFrontImg != null) {
+            g.drawImage(enemyFrontImg, enemyX, enemyY, this);
+        }
+
+        // 이름 / HP 바 표시 (대충 감성만)
+        drawStatusBars((Graphics2D) g);
+    }
+
+    private void drawStatusBars(Graphics2D g2) {
+        // 내 포켓몬 상태바
+        if (myPokemon != null) {
+            int barX = 40;
+            int barY = 30;
+            int barW = 260;
+            int barH = 20;
+
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
+            g2.drawString(myPokemon.getKoreanName() + " Lv." + myPokemon.getLevel(), barX, barY - 8);
+
+            int maxHp = myPokemon.calcMaxHp();
+            int curHp = myPokemon.getCurrentHp();
+            double ratio = maxHp == 0 ? 0 : (double) curHp / maxHp;
+
+            g2.setColor(Color.DARK_GRAY);
+            g2.fillRoundRect(barX, barY, barW, barH, 10, 10);
+
+            int hpW = (int) (barW * ratio);
+            g2.setColor(new Color(80, 220, 80));
+            g2.fillRoundRect(barX, barY, hpW, barH, 10, 10);
+        }
+
+        // 상대 포켓몬 상태바
+        if (enemyPokemon != null) {
+            int barW = 260;
+            int barH = 20;
+            int barX = PANEL_W - barW - 40;
+            int barY = 30;
+
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 20));
+            g2.drawString(
+                    enemyPokemon.getKoreanName() + " Lv." + enemyPokemon.getLevel(),
+                    barX, barY - 8
+            );
+
+            int maxHp = enemyPokemon.calcMaxHp();
+            int curHp = enemyPokemon.getCurrentHp();
+            double ratio = maxHp == 0 ? 0 : (double) curHp / maxHp;
+
+            g2.setColor(Color.DARK_GRAY);
+            g2.fillRoundRect(barX, barY, barW, barH, 10, 10);
+
+            int hpW = (int) (barW * ratio);
+            g2.setColor(new Color(220, 80, 80));
+            g2.fillRoundRect(barX, barY, hpW, barH, 10, 10);
+        }
+
+        // 화면 하단에 “상대: xxx” 정도 텍스트
+        if (opponentName != null) {
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("PF Stardust Bold", Font.BOLD, 22));
+            g2.drawString("상대: " + opponentName, 40, PANEL_H - 40);
+        }
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        return new Dimension(PANEL_W, PANEL_H);
     }
 }

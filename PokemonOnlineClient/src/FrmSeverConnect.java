@@ -509,7 +509,8 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
     }
 
     @Override
-    public void onBattleStartRequest(String myPokemonId,
+    public void onBattleStartRequest(String myPokemonId, 
+    								 String enemyPokemonId,
                                      String opponentName,
                                      Socket socket,
                                      DataInputStream dis,
@@ -519,6 +520,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                 + myPokemonId + ", opponent=" + opponentName);
 
         Pokemon myPokemon = PokemonRepository.getInstance().getById(myPokemonId);
+        Pokemon enemyPokemon =PokemonRepository.getInstance().getById(enemyPokemonId);
         if (myPokemon == null) {
             JOptionPane.showMessageDialog(
                     this,
@@ -536,6 +538,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
             SwingUtilities.invokeLater(() -> {
                 JplBattlePanel battlePanel = new JplBattlePanel(
                         myPokemon,
+                        enemyPokemon,
                         opponentName,
                         socket,
                         dis,

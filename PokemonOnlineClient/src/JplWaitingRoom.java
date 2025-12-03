@@ -81,6 +81,8 @@ public class JplWaitingRoom extends JPanel {
 	private boolean myReady = false;
 	private boolean opponentReady = false;
 	
+	//상대 포켓몬 아이디 추가
+	private String opponentPokemonId;
 	// 포켓몬 이름들 (이미지 파일명과 매칭)
 	private String[] pokemonNames = {"이상해씨", "파이리", "꼬부기"};
 	// 포켓몬 종 id들 (pokemon_species.json의 id와 매칭)
@@ -689,6 +691,14 @@ public class JplWaitingRoom extends JPanel {
 
 	            opponentName = name;
 
+	            // 상대 포켓몬 이
+	            if (parts.length >= 4) {
+	                String enemyKorPokemon = parts[3].trim();  // 상대포켓몬 
+	                opponentPokemonId = koreanNameToId(enemyKorPokemon); // "charmander" 등
+	                System.out.println("[DEBUG] opponent_info 포켓몬: "
+	                        + enemyKorPokemon + " -> id=" + opponentPokemonId);
+	            }
+	            
 	            // 상대방 정보를 받았다 = 2명이 된 것 -> 15초 타이머 시작
 	            if (waitingTimer != null && !waitingTimer.isRunning() && !myReady) {
 	                waitingTimer.start();
@@ -714,7 +724,16 @@ public class JplWaitingRoom extends JPanel {
 	    //  이름만 상태에 적
 	    if (message.startsWith("/opponent_ready")) {
 	        opponentReady = true;
-
+	        
+	        //포켓몬 한글 이름 파
+	        String[] parts = message.split("\\s+", 2);
+	        if (parts.length >= 2) {
+	            String enemyKorName = parts[1].trim();   // "꼬부기"
+	            opponentPokemonId = koreanNameToId(enemyKorName);  // "squirtle"
+	            System.out.println("[DEBUG] opponent_ready 포켓몬: " + enemyKorName
+	                    + " -> id=" + opponentPokemonId);
+	        }
+	        
 	        String displayName = (opponentName == null || opponentName.isBlank())
 	                ? "상대"
 	                : opponentName;
@@ -735,13 +754,29 @@ public class JplWaitingRoom extends JPanel {
 	        int right = message.indexOf(']');
 	        if (left >= 0 && right > left) {
 	            String name = message.substring(left + 1, right).trim();
+	            
+	            // 포켓몬 한글이름 파싱: "포켓몬: 꼬부기" -> "꼬부기" 만 뽑
+	            String enemyKorPokemon = null;
+	            int idx = message.indexOf("포켓몬:");
+	            if (idx >= 0) {
+	                int start = idx + "포켓몬:".length();
+	                int end = message.indexOf(')', start);
+	                if (end < 0) end = message.length();
+	                enemyKorPokemon = message.substring(start, end).trim();
+	            }
 
 	            // 내 이름이면 무시
 	            if (name.equals(username)) return;
 
 	            opponentName = name;
 	            opponentReady = true;
-
+	            
+	            if (enemyKorPokemon != null && !enemyKorPokemon.isBlank()) {
+	                opponentPokemonId = koreanNameToId(enemyKorPokemon);
+	                System.out.println("[DEBUG] broadcast ready 포켓몬: "
+	                        + enemyKorPokemon + " -> id=" + opponentPokemonId);
+	            }
+	            
 	            lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택 완료");
 	            lblOpponentStatus.setForeground(new Color(0, 190, 0)); // 초록
 
@@ -860,7 +895,15 @@ public class JplWaitingRoom extends JPanel {
 	                if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
 	                    myPokemonId = pokemonIds[selectedPokemon - 1];
 	                }
-	            	battleStartListener.onBattleStartRequest(myPokemonId, opponentName, socket, dis, dos ); 
+	             	// 여기서 상대 포켓몬 id까지 넘김
+	                battleStartListener.onBattleStartRequest(
+	                        myPokemonId,
+	                        opponentPokemonId,   // 새로 추가된 필드
+	                        opponentName,
+	                        socket,
+	                        dis,
+	                        dos
+	                );	            
 	            }
 	        } else {
 	            lblTimer.setText(String.valueOf(startCountdown));
@@ -871,5 +914,17 @@ public class JplWaitingRoom extends JPanel {
 	    startCountdownTimer.setInitialDelay(1000);
 	    startCountdownTimer.start();
 	}
+	private String koreanNameToId(String korName) {
+	    if (korName == null || korName.isBlank()) return null;
+
+	    // 1) 지금 쓰는 배열 기반 매핑
+	    for (int i = 0; i < pokemonNames.length; i++) {
+	        if (korName.equals(pokemonNames[i])) {
+	            return pokemonIds[i];
+	        }
+	    }
+	    return null;
+	}
+
 }
 
