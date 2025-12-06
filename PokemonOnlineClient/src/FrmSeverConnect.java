@@ -27,6 +27,7 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.DocumentFilter;
@@ -51,6 +52,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
     private final JLabel lblName = new JLabel("Name: ");
     private final JButton btnConnect = new JButton("접속");
     private final JButton btnExit = new JButton("나가기");
+    private final JButton btnTest = new JButton("테스트");
 
     // 현재 화면 패널 / 대기실 패널
     private JPanel currentPanel;
@@ -226,6 +228,16 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         btnExit.setForeground(Color.WHITE);
         btnExit.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+        btnTest.setFont(fieldFont);
+        btnTest.setBounds(750, 624, 208, 68);
+        // 플랫 스타일
+        btnTest.setContentAreaFilled(false);
+        btnTest.setBorderPainted(false);
+        btnTest.setFocusPainted(false);
+        btnTest.setOpaque(false);
+        btnTest.setForeground(Color.WHITE);
+        btnTest.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
         // 버튼 아이콘(Images/btn_up.png) 적용 - 버튼 크기에 맞춰 스케일
         int btnW = 208;
         int btnH = 68;
@@ -258,6 +270,19 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                 btnExit.setRolloverIcon(iconDown);
                 btnExit.setPressedIcon(iconDown);
             }
+
+            btnTest.setIcon(iconUp);
+            btnTest.setText("테스트");
+            btnTest.setHorizontalTextPosition(SwingConstants.CENTER);
+            btnTest.setVerticalTextPosition(SwingConstants.CENTER);
+            btnTest.setIconTextGap(0);
+            btnTest.setFont(fieldFont.deriveFont(Font.BOLD, 28f));
+            btnTest.setForeground(Color.BLACK);
+            btnTest.setRolloverEnabled(true);
+            if (iconDown != null) {
+                btnTest.setRolloverIcon(iconDown);
+                btnTest.setPressedIcon(iconDown);
+            }
         }
 
         // 자동 IP 선택: 생성시 자동으로 로컬 LAN 주소를 채웁니다.
@@ -275,6 +300,12 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
             System.exit(0);
         });
 
+        // 테스트 버튼 액션 (몬스터볼 모션 및 배틀 화면 테스트)
+        btnTest.addActionListener(e -> {
+            // 임의의 포켓몬 2마리로 배틀 시작 squirtle / bulbasaur / charmander
+            onBattleStartRequest("bulbasaur", "bulbasaur", "테스트상대", null, null, null);
+        });
+
         PnlBackGround.add(lblIP);
         PnlBackGround.add(txtIP);
         PnlBackGround.add(lblPort);
@@ -283,6 +314,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         PnlBackGround.add(txtName);
         PnlBackGround.add(btnConnect);
         PnlBackGround.add(btnExit);
+        PnlBackGround.add(btnTest);
         // (Auto 버튼 제거 — 자동으로 초기값을 채움)
 
         currentPanel = PnlBackGround;     // 현재 화면
@@ -530,12 +562,19 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
             );
             return;
         }
-        // 1) 몬스터볼 연출 패널 생성
-        JplBallTransition transitionPanel = new JplBallTransition(() -> {
+        // 1) 몬스터볼 연출 패널 생성 (배열로 감싸서 람다에서 접근 가능하도록)
+        final JplBallTransition[] transitionPanelHolder = new JplBallTransition[1];
+        
+        transitionPanelHolder[0] = new JplBallTransition(() -> {
             // 이 Runnable은 "연출이 완전히 끝난 뒤"에 호출됨
 
             // 2) 여기서 배틀 패널 생성 후 화면 전환
             SwingUtilities.invokeLater(() -> {
+                // 먼저 트랜지션 패널 제거
+                if (transitionPanelHolder[0] != null) {
+                    getLayeredPane().remove(transitionPanelHolder[0]);
+                }
+                
                 JplBattlePanel battlePanel = new JplBattlePanel(
                         myPokemon,
                         enemyPokemon,
@@ -546,17 +585,15 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                 );
 
                 setContentPane(battlePanel);
-                //pack();
                 setLocationRelativeTo(null);
                 revalidate();
                 repaint();
             });
         });
 
-        // 3) 현재 프레임 내용물을 연출 패널로 교체
-        setContentPane(transitionPanel);
-        //pack();
-        setLocationRelativeTo(null);
+        // 3) LayeredPane을 사용하여 현재 패널 위에 오버레이
+        transitionPanelHolder[0].setBounds(0, 0, getWidth(), getHeight());
+        getLayeredPane().add(transitionPanelHolder[0], JLayeredPane.POPUP_LAYER);
         revalidate();
         repaint();
     }

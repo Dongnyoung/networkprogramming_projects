@@ -712,7 +712,7 @@ public class JplWaitingRoom extends JPanel {
 	                    onBothReady();
 	                }
 	            } else {
-	                opponentReady = false;
+	                opponentReady = false; 
 	                lblOpponentStatus.setText("■ " + opponentName + ": 포켓몬 선택중");
 	                lblOpponentStatus.setForeground(new Color(245, 245, 220)); // 베이지
 	            }
@@ -886,7 +886,7 @@ public class JplWaitingRoom extends JPanel {
 	    startCountdownTimer = new Timer(1000, e -> {
 	        startCountdown--;
 
-	        if (startCountdown <= 0) {
+	        if (startCountdown <= 0) {  
 	            startCountdownTimer.stop();
 	            lblTimer.setText("0");
 
