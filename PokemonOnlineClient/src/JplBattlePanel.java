@@ -47,17 +47,16 @@ public class JplBattlePanel extends JPanel {
 
     private boolean chatOpen = false;
 
-    // ===== Background / UI =====
     private Image bg;
     private Image infoMeImg;
     private Image infoOpponentImg;
 
-    // My Pokemon
+
     private Image myBackImg;
     private int myImgW = 256;
     private int myImgH = 256;
 
-    // Enemy Pokemon
+
     private Image enemyFrontImg;
     private int enemyImgW = 256;
     private int enemyImgH = 256;
@@ -72,13 +71,13 @@ public class JplBattlePanel extends JPanel {
     private boolean animMy = false;
     private boolean animEnemy = false;
 
-    // HP bar anim
+    // HP 
     private double myHpRatio = 0.0;
     private double enemyHpRatio = 0.0;
     private Timer hpBarTimer;
     private boolean hpBarAnimStarted = false;
 
-    // Curtain effect
+    // 커튼 효과 
     private Image curtainBgImg;
     private int curtainTopY = 0;
     private int curtainBottomY = 384;
@@ -148,7 +147,7 @@ public class JplBattlePanel extends JPanel {
     private void initChatUI() {
         loadChatButtonSprite();
 
-        // 시작 위치: 오른쪽 밖에서 시작(적은 왼쪽에서 오니까 채팅은 오른쪽에서 오는 느낌 OK)
+        // 시작 위치: 오른쪽 밖에서 시작(적은 왼쪽에서 오니까 채팅은 오른쪽에서 오는 느낌)
         chatBtnX = PANEL_W + 60;
         chatBtnY = chatBtnTargetY;
 
@@ -188,7 +187,7 @@ public class JplBattlePanel extends JPanel {
             @Override
             public void mouseExited(MouseEvent e) {
                 chatHoverTimer.stop();
-                // hover 끝나면 "정상 아이콘"으로 복귀(회전은 유지 안 함)
+                // hover 끝나면 원래 아이콘 으로 복귀(회전은 유지 안 함)
                 chatToggleBtn.setIcon(chatFrames[0]);
                 chatToggleBtn.setBounds(chatBtnBaseBounds);
             }
@@ -325,9 +324,6 @@ public class JplBattlePanel extends JPanel {
         }
     }
 
-    // =========================
-    // Resource Loads
-    // =========================
     private void loadBackground() {
         try {
             int n = 1 + (int) (Math.random() * 4);
@@ -388,10 +384,6 @@ public class JplBattlePanel extends JPanel {
             e.printStackTrace();
         }
     }
-
-    // =========================
-    // Entry anim (pokemon)
-    // =========================
     private void initMyPositionAndStartAnim() {
         if (myBackImg == null) return;
 
