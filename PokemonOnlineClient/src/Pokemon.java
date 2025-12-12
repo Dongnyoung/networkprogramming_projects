@@ -45,6 +45,8 @@ public class Pokemon {
     // 보유 스킬 목록 (전투에서 사용 가능한 스킬들, 보통 최대 4개)
     private final List<Skill> skills = new ArrayList<>();
 
+    // 런타임 상태: 최대 체력
+    private int maxHp;
     // 런타임 상태: 현재 남은 체력
     private int currentHp;
 
@@ -66,7 +68,9 @@ public class Pokemon {
         this.frontImageFile = frontImageFile;
         this.backImageFile = backImageFile;
         // set current HP to max on create
-        this.currentHp = calcMaxHp();
+        this.maxHp = calcMaxHp();
+        this.currentHp = this.maxHp;
+
     }
 
     public String getId() { return id; }
@@ -112,12 +116,15 @@ public class Pokemon {
 
     public void removeSkill(Skill s) { skills.remove(s); }
 
+    public int getMaxHp() { return maxHp; }
+    public void setMaxHp(int maxHp) { this.maxHp = maxHp; }
+
     public int getCurrentHp() { return currentHp; }
-    public void setCurrentHp(int currentHp) { this.currentHp = Math.max(0, Math.min(currentHp, calcMaxHp())); }
+    public void setCurrentHp(int currentHp) { this.currentHp = Math.max(0, Math.min(currentHp, this.maxHp)); }
 
     public int calcMaxHp() {
-        // very simple formula: baseHp + level * 2 (placeholder)
-        return baseHp + Math.max(0, level) * 2;
+        // HP = ((종족값 × 2 × 레벨) ÷ 100) + 레벨 + 10
+        return ((baseHp * 2 * level) / 100) + level + 10;
     }
 
     public void takeDamage(int d) {

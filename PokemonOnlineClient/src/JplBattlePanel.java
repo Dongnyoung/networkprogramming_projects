@@ -414,6 +414,18 @@ public class JplBattlePanel extends JPanel {
             int hpW = (int)(barW * myHpRatio);
             g.setColor(new Color(80, 220, 80));
             g.fillRect(barX, barY, hpW, barH);
+            
+            // HP 수치 표시 (현재체력 / 최대체력) - 오른쪽 정렬
+            String hpText = myPokemon.getCurrentHp() + " / " + myPokemon.getMaxHp();
+            g.setFont(new Font("PF Stardust Bold", Font.PLAIN, 36));
+            FontMetrics fm = g.getFontMetrics();
+            int textWidth = fm.stringWidth(hpText);
+            // 그림자
+            g.setColor(new Color(212, 204, 171));
+            g.drawString(hpText, infoX + 470 - textWidth + 2, infoY + 133 + 2);
+            // 실제 텍스트
+            g.setColor(Color.BLACK);
+            g.drawString(hpText, infoX + 470 - textWidth, infoY + 133);
         }
 
         // 상대 포켓몬 정보창 (왼쪽에 배치)
