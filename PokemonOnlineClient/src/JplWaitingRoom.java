@@ -83,6 +83,8 @@ public class JplWaitingRoom extends JPanel {
 	
 	//상대 포켓몬 아이디 추가
 	private String opponentPokemonId;
+	// 배경 번호 (서버에서 받음)
+	private int backgroundNumber = 1;
 	// 포켓몬 이름들 (이미지 파일명과 매칭)
 	private String[] pokemonNames = {"이상해씨", "파이리", "꼬부기"};
 	// 포켓몬 종 id들 (pokemon_species.json의 id와 매칭)
@@ -804,6 +806,17 @@ public class JplWaitingRoom extends JPanel {
 
 	    // 5) 게임 시작 신호
 	    if (message.startsWith("/start_game")) {
+	    	// 배경 번호 추출 (예: "/start_game 3")
+	    	String[] parts = message.split(" ");
+	    	if (parts.length >= 2) {
+	    		try {
+	    			backgroundNumber = Integer.parseInt(parts[1]);
+	    		} catch (NumberFormatException e) {
+	    			backgroundNumber = 1; // 기본값
+	    		}
+	    	} else {
+	    		backgroundNumber = 1; // 기본값
+	    	}
 	    	startGameCountdown();
 	        return;
 	    }
@@ -895,14 +908,15 @@ public class JplWaitingRoom extends JPanel {
 	                if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
 	                    myPokemonId = pokemonIds[selectedPokemon - 1];
 	                }
-	             	// 여기서 상대 포켓몬 id까지 넘김
+	             	// 여기서 상대 포켓몬 id와 배경 번호까지 넘김
 	                battleStartListener.onBattleStartRequest(
 	                        myPokemonId,
 	                        opponentPokemonId,   // 새로 추가된 필드
 	                        opponentName,
 	                        socket,
 	                        dis,
-	                        dos
+	                        dos,
+	                        backgroundNumber    // 서버에서 받은 배경 번호
 	                );	            
 	            }
 	        } else {

@@ -63,7 +63,8 @@ public class JplBattlePanel extends JPanel {
                           String opponentName,
                           Socket socket,
                           DataInputStream dis,
-                          DataOutputStream dos) {
+                          DataOutputStream dos,
+                          int backgroundNumber) {
 
         this.myPokemon = myPokemon;
         this.enemyPokemon = enemyPokemon;
@@ -76,7 +77,7 @@ public class JplBattlePanel extends JPanel {
         setLayout(null);          // 나중에 스킬 버튼 깔기 편하게
         setDoubleBuffered(true);
 
-        loadBackground();
+        loadBackground(backgroundNumber);
         loadCurtainImage();
         loadInfoImages();
         loadMyPokemonImage();
@@ -93,13 +94,12 @@ public class JplBattlePanel extends JPanel {
         }
     }
 
-    private void loadBackground() {
+    private void loadBackground(int bgNumber) {
         try {
-            int n = 1 + (int)(Math.random() * 4);  // 1~4 랜덤
-            String path = "Images/bg_arena" + n + ".png";
-
+            String path = "Images/bg_arena" + bgNumber + ".png";
             bg = new ImageIcon(path).getImage();
         } catch (Exception e) {
+            System.err.println("Failed to load background: bg_arena" + bgNumber + ".png");
             bg = null;
         }
     }

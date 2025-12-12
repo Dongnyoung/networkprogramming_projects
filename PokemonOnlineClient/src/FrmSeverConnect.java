@@ -303,7 +303,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         // 테스트 버튼 액션 (몬스터볼 모션 및 배틀 화면 테스트)
         btnTest.addActionListener(e -> {
             // 임의의 포켓몬 2마리로 배틀 시작 squirtle / bulbasaur / charmander
-            onBattleStartRequest("bulbasaur", "bulbasaur", "테스트상대", null, null, null);
+            onBattleStartRequest("charmander", "bulbasaur", "테스트상대", null, null, null, 1);
         });
 
         PnlBackGround.add(lblIP);
@@ -546,10 +546,11 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                                      String opponentName,
                                      Socket socket,
                                      DataInputStream dis,
-                                     DataOutputStream dos) {
+                                     DataOutputStream dos,
+                                     int backgroundNumber) {
 
         System.out.println("[DEBUG] 배틀 시작 요청: selectedPokemon="
-                + myPokemonId + ", opponent=" + opponentName);
+                + myPokemonId + ", opponent=" + opponentName + ", background=" + backgroundNumber);
 
         Pokemon myPokemon = PokemonRepository.getInstance().getById(myPokemonId);
         Pokemon enemyPokemon =PokemonRepository.getInstance().getById(enemyPokemonId);
@@ -581,7 +582,8 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                         opponentName,
                         socket,
                         dis,
-                        dos
+                        dos,
+                        backgroundNumber
                 );
 
                 setContentPane(battlePanel);

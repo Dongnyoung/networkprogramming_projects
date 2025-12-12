@@ -189,8 +189,10 @@ public class UserService extends Thread {
                         }
 
                         if (allUsersReady()) {
-                            WriteAll("/start_game\n");
-                            server.AppendText("모든 사용자가 준비완료! 게임을 시작합니다.");
+                            // 배경 번호 랜덤 생성 (1~4)
+                            int bgNumber = 1 + (int)(Math.random() * 4);
+                            WriteAll("/start_game " + bgNumber + "\n");
+                            server.AppendText("모든 사용자가 준비완료! 게임을 시작합니다. (배경: " + bgNumber + ")");
                         }
                         break;
 
