@@ -51,16 +51,17 @@ public class JplBattlePanel extends JPanel {
     private Image infoMeImg;
     private Image infoOpponentImg;
 
-
+    // 내 포켓몬(뒷모습) 이미지
     private Image myBackImg;
     private int myImgW = 256;
     private int myImgH = 256;
 
-
+    // 상대 포켓몬(앞모습) 이미지
     private Image enemyFrontImg;
     private int enemyImgW = 256;
     private int enemyImgH = 256;
 
+    // 현재 좌표 & 타겟 좌표
     private int myX, myY;
     private int myTargetX, myTargetY;
 
@@ -71,19 +72,19 @@ public class JplBattlePanel extends JPanel {
     private boolean animMy = false;
     private boolean animEnemy = false;
 
-    // HP 
-    private double myHpRatio = 0.0;
+    // 체력바 애니메이션 변수
+    private double myHpRatio = 0.0; // 현재 표시 중인 HP 비율 (0.0 ~ 1.0)
     private double enemyHpRatio = 0.0;
     private Timer hpBarTimer;
     private boolean hpBarAnimStarted = false;
 
-    // 커튼 효과 
-    private Image curtainBgImg;
-    private int curtainTopY = 0;
-    private int curtainBottomY = 384;
-    private int curtainTargetTopY = -385;
-    private int curtainTargetBottomY = 768;
-    private boolean curtainActive = true;
+    // 커튼 효과 변수
+    private Image curtainBgImg; 
+    private int curtainTopY = 0; // 상단 커튼 Y 위치
+    private int curtainBottomY = 384; // 하단 커튼 Y 위치
+    private int curtainTargetTopY = -385; // 상단 커튼 목표 위치
+    private int curtainTargetBottomY = 768; // 하단 커튼 목표 위치
+    private boolean curtainActive = true; // 커튼 효과 활성 여부
     private Timer curtainTimer;
 
     public JplBattlePanel(Pokemon myPokemon,
@@ -101,7 +102,7 @@ public class JplBattlePanel extends JPanel {
         this.dos = dos;
 
         setBackground(Color.BLACK);
-        setLayout(null);
+        setLayout(null);   // 나중에 스킬 버튼 깔기 편하게
         setDoubleBuffered(true);
 
         loadBackground();
@@ -110,6 +111,7 @@ public class JplBattlePanel extends JPanel {
         loadMyPokemonImage();
         initMyPositionAndStartAnim();
 
+        // 커튼 효과 시작
         startCurtainEffect();
 
         if (this.enemyPokemon != null) {
