@@ -122,6 +122,12 @@ public class JplBattlePanel extends JPanel {
     private int myFaintOffset = 0;  // 아래로 이동한 픽셀 수
     private int enemyFaintOffset = 0;
 
+    private final Runnable stopBattleBgm;
+    private BgmPlayer bgmPlayer; // 효과음용
+    public void setBgmPlayer(BgmPlayer bgmPlayer) {
+        this.bgmPlayer = bgmPlayer;
+        bindClickSfxToAllButtons();
+    }
     public JplBattlePanel(Pokemon myPokemon,
     					  Pokemon enemyPokemon,
                           String myUsername,
@@ -129,7 +135,8 @@ public class JplBattlePanel extends JPanel {
                           Socket socket,
                           DataInputStream dis,
                           DataOutputStream dos,
-                          int backgroundNumber) {
+                          int backgroundNumber,
+                          Runnable stopBattleBgm) {
 
         this.myPokemon = myPokemon;
         this.enemyPokemon = enemyPokemon;
@@ -138,7 +145,7 @@ public class JplBattlePanel extends JPanel {
         this.socket = socket;
         this.dis = dis;
         this.dos = dos;
-        
+        this.stopBattleBgm = stopBattleBgm;
         // 재연결을 위한 서버 정보 저장
         try {
             this.serverIp = socket.getInetAddress().getHostAddress();
@@ -172,7 +179,7 @@ public class JplBattlePanel extends JPanel {
         
         // 커튼 효과 시작
         startCurtainEffect();
-
+        
         if (this.enemyPokemon != null) {
             loadEnemyPokemonImage();
             initEnemyPositionAndStartAnim();
@@ -201,6 +208,13 @@ public class JplBattlePanel extends JPanel {
         });
         initialMessageTimer.setRepeats(false);
         initialMessageTimer.start();
+    }
+    
+    private void bindClickSfxToAllButtons() {
+    	ButtonSfxBinder.bindAllButtons(this, bgmPlayer, "bgm/ding.wav", -10.0f);
+	}
+	private void stopBgmSafely() {
+    	if(stopBattleBgm != null) stopBattleBgm.run();
     }
     
     // 배틀 결과 처리 (JplWaitingRoom에서 호출)
@@ -309,6 +323,10 @@ public class JplBattlePanel extends JPanel {
             // 명중 - 깜빡임 애니메이션 후 HP 감소
             startLogTyping(attacker + "의 " + skillName + " 공격!", () -> {
                 Timer attackDelayTimer = new Timer(500, e -> {
+                	// ouch 효과음
+                	if (bgmPlayer != null) {
+                        bgmPlayer.playSfxOnce("bgm/ouch.wav", -10.0f, null);
+                    }
                     // 깜빡임 애니메이션 (맞는 포켓몬)
                     animateBlink(!iAmAttacker, () -> {
                         // HP 감소
@@ -455,6 +473,10 @@ public class JplBattlePanel extends JPanel {
         
         // 상대 포켓몬 쓰러지는 모션
         animateFaint(false, () -> {
+        	stopBgmSafely();
+        	if (bgmPlayer != null) {
+                bgmPlayer.playSfxOnce("bgm/victory.wav", -10.0f, null);
+            }
             // "상대 {포켓몬 이름}이(가) 쓰러졌다"
             startLogTyping("상대 " + enemyPokemon.getKoreanName() + "이(가) 쓰러졌다!", () -> {
                 Timer victoryTimer = new Timer(1000, e -> {
@@ -486,6 +508,7 @@ public class JplBattlePanel extends JPanel {
         
         // 내 포켓몬 쓰러지는 모션
         animateFaint(true, () -> {
+        	stopBgmSafely();
             // "{포켓몬 이름}이(가) 쓰러졌다"
             startLogTyping(myPokemon.getKoreanName() + "이(가) 쓰러졌다!", () -> {
                 Timer defeatTimer = new Timer(1000, e -> {
@@ -580,6 +603,7 @@ public class JplBattlePanel extends JPanel {
         });
         
         btnMainMenu.addActionListener(e -> {
+        	stopBgmSafely(); //브금끄기
             // 소켓 연결 끊기
             try {
                 if (dos != null) dos.writeUTF("/exit");
@@ -631,6 +655,7 @@ public class JplBattlePanel extends JPanel {
         });
         
         btnRetry.addActionListener(e -> {
+        	
             // 기존 소켓 연결 닫기
             try {
                 if (dos != null) dos.writeUTF("/exit");
@@ -638,7 +663,7 @@ public class JplBattlePanel extends JPanel {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-            
+            stopBgmSafely();// 브금끄기
             // 저장된 정보로 재연결하여 대기실로 이동
             Window window = SwingUtilities.getWindowAncestor(this);
             if (window instanceof JFrame) {
@@ -672,6 +697,7 @@ public class JplBattlePanel extends JPanel {
         
         // 패널 표시
         showSkillPanel();
+        ButtonSfxBinder.bindAllButtons(skillPanel, bgmPlayer, "bgm/ding.wav", -10.0f);
     }
 
     private void loadBackground(int bgNumber) {
