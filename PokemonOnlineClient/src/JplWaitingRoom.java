@@ -89,6 +89,8 @@ public class JplWaitingRoom extends JPanel {
 	
 	//상대 포켓몬 아이디 추가
 	private String opponentPokemonId;
+	// 배경 번호 (서버에서 받음)
+	private int backgroundNumber = 1;
 	// 포켓몬 이름들 (이미지 파일명과 매칭)
 	private String[] pokemonNames = {"이상해씨", "파이리", "꼬부기"};
 	
@@ -101,10 +103,12 @@ public class JplWaitingRoom extends JPanel {
 	private boolean selectionLocked = false;
 	
 	private BattleStartListener battleStartListener;
+	private FrmSeverConnect frmParent; // 프레임 참조
 	
-	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener) {
+	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener, FrmSeverConnect frame) {
 		this.username = username;
 		this.battleStartListener = battleStartListener;
+		this.frmParent = frame;
 		setLayout(null);
 		
 		// 배경 이미지 로드
@@ -466,7 +470,7 @@ public class JplWaitingRoom extends JPanel {
 		typingTarget = (message == null) ? "" : message;
 		typingIndex = 0;
 		lblStatus.setText("");
-		int delay = 70; // ms per character
+		int delay = 40; // ms per character
 		statusTypingTimer = new Timer(delay, ev -> {
 			if (typingIndex <= typingTarget.length()) {
 				typingIndex++;
@@ -813,13 +817,33 @@ public class JplWaitingRoom extends JPanel {
 
 	    // 5) 게임 시작 신호
 	    if (message.startsWith("/start_game")) {
+	    	// 배경 번호 추출 (예: "/start_game 3")
+	    	String[] parts = message.split(" ");
+	    	if (parts.length >= 2) {
+	    		try {
+	    			backgroundNumber = Integer.parseInt(parts[1]);
+	    		} catch (NumberFormatException e) {
+	    			backgroundNumber = 1; // 기본값
+	    		}
+	    	} else {
+	    		backgroundNumber = 1; // 기본값
+	    	}
 	    	if (gameStarting) return;
 	        gameStarting = true;
 	        startGameCountdown();
 	        return;
 	    }
 
-	    // 그 외 메시지 (로그용)
+    // 6) 퇴장 메시지: "[이름]님이 퇴장 하였습니다."
+    if (message.contains("님이 퇴장 하였습니다.")) {
+        // 배틀 중이면 상대방 연결 끊김 처리
+        if (frmParent != null && frmParent.battlePanel != null) {
+            frmParent.battlePanel.handleOpponentDisconnect();
+        }
+        return;
+    }
+
+    // 그 외 메시지 (로그용)
 	    System.out.println("[INFO] Unhandled message: " + message);
 	}
 
@@ -848,11 +872,18 @@ public class JplWaitingRoom extends JPanel {
 	                }
 	            }
 	        } catch (IOException e) {
-	            if (!running) return; // 정상 종료면 무시
+	            if (!running) return;
 	            javax.swing.SwingUtilities.invokeLater(() -> {
-	                JOptionPane.showMessageDialog(JplWaitingRoom.this,
-	                        "서버 연결이 끊어졌습니다.",
-	                        "연결 종료", JOptionPane.ERROR_MESSAGE);
+	                if (frmParent != null && frmParent.battlePanel != null) {
+	                    frmParent.battlePanel.handleOpponentDisconnect();
+	                } else {
+	                    JOptionPane.showMessageDialog(
+	                        JplWaitingRoom.this,
+	                        "서버와의 연결이 끊어졌습니다.",
+	                        "연결 오류",
+	                        JOptionPane.ERROR_MESSAGE
+	                    );
+	                }
 	            });
 	        }
 	    }
@@ -902,22 +933,24 @@ public class JplWaitingRoom extends JPanel {
 	            startCountdownTimer.stop();
 	            lblTimer.setText("0");
 
-	            if (battleStartListener != null) {
-	            	String myPokemonId = null;
-	                if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
-	                    myPokemonId = pokemonIds[selectedPokemon - 1];
-	                }
-	             	// 여기서 상대 포켓몬 id까지 넘김
-	                battleStartListener.onBattleStartRequest(
-	                        myPokemonId,
-	                        opponentPokemonId,   // 새로 추가된 필드
-	                        opponentName,
-	                        socket,
-	                        dis,
-	                        dos,
-	                        this
-	                );	            
-	            }
+				if (battleStartListener != null) {
+					String myPokemonId = null;
+					if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
+						myPokemonId = pokemonIds[selectedPokemon - 1];
+					}
+					// 여기서 상대 포켓몬 id와 배경 번호까지 넘김
+					battleStartListener.onBattleStartRequest(
+							username,
+							myPokemonId,
+							opponentPokemonId,
+							opponentName,
+							socket,
+							dis,
+							dos,
+							backgroundNumber,
+							this
+					);	            
+				}
 	        } else {
 	            lblTimer.setText(String.valueOf(startCountdown));
 	        }
