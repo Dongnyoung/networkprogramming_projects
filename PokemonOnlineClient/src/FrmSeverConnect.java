@@ -303,7 +303,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         // 테스트 버튼 액션 (몬스터볼 모션 및 배틀 화면 테스트)
         btnTest.addActionListener(e -> {
             // 임의의 포켓몬 2마리로 배틀 시작 squirtle / bulbasaur / charmander
-            onBattleStartRequest("bulbasaur", "bulbasaur", "테스트상대", null, null, null);
+            onBattleStartRequest("bulbasaur", "bulbasaur", "테스트상대", null, null, null,null);
         });
 
         PnlBackGround.add(lblIP);
@@ -500,6 +500,9 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                     }
                     try (Socket sock = new Socket()) {
                         sock.connect(new InetSocketAddress(ip, p), 2000); // 2초 타임아웃
+                        DataOutputStream dos = new DataOutputStream(sock.getOutputStream());
+                        dos.writeUTF("/probe"); // 서버 연결 테스트용
+                        dos.flush();
                         return true;
                     } catch (Exception ex) {
                         return false;
@@ -546,7 +549,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                                      String opponentName,
                                      Socket socket,
                                      DataInputStream dis,
-                                     DataOutputStream dos) {
+                                     DataOutputStream dos,JplWaitingRoom waitingRoom) {
 
         System.out.println("[DEBUG] 배틀 시작 요청: selectedPokemon="
                 + myPokemonId + ", opponent=" + opponentName);
@@ -583,7 +586,9 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                         dis,
                         dos
                 );
-
+                if (this.waitingPanel != null) {
+                	this.waitingPanel.setMessageHandler(msg -> battlePanel.handleServerMessage(msg));
+                }
                 setContentPane(battlePanel);
                 setLocationRelativeTo(null);
                 revalidate();

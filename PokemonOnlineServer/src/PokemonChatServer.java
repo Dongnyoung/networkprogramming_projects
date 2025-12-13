@@ -134,8 +134,7 @@ public class PokemonChatServer extends JFrame {
 
 					// User 당 하나씩 Thread 생성
 					UserService new_user = new UserService(client_socket, PokemonChatServer.this);
-					UserVec.add(new_user);
-					AppendText("사용자 입장. 현재 참가자 수 " + UserVec.size());
+					//UserVec.add(new_user);
 					new_user.start();
 				} catch (IOException e) {
 					if (isServerRunning) {
