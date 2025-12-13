@@ -54,6 +54,8 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
     private final JButton btnExit = new JButton("나가기");
     private final JButton btnTest = new JButton("테스트");
 
+    private final BgmPlayer bgm = new BgmPlayer();
+    
     // 현재 화면 패널 / 대기실 패널
     private JPanel currentPanel;
     private JplWaitingRoom waitingPanel;   // JPanel 버전의 대기실
@@ -131,6 +133,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
      * Create the frame.
      */
     public FrmSeverConnect() {
+    	bgm.playLoop("bgm/opening.wav", -13.0f);
         // 앱 시작 시 기본 포켓몬 종들을 로드(전역 레포지토리)
         try { PokemonRepository.getInstance().loadDefaults(); } catch (Throwable t) { /* 무시 */ }
         txtIP.setColumns(10);
@@ -322,6 +325,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         setContentPane(currentPanel);
         pack();
         setLocationRelativeTo(null);
+        ButtonSfxBinder.bindAllButtons(getContentPane(), bgm, "bgm/ding.wav", -10.0f);
     }
 
     class ImagePanel extends JPanel {
@@ -590,10 +594,16 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                         socket,
                         dis,
                         dos,
-                        backgroundNumber
+                        backgroundNumber,()->{
+                        	if (waitingRoom != null) {
+                                waitingRoom.stopBattleBgm();
+                            }
+                        }
                 );
                 // waitingRoom의 messageHandler를 battlePanel로 변경
                 if (waitingRoom != null) {
+                	battlePanel.setBgmPlayer(waitingRoom.getBgmPlayer());
+                	System.out.println("[DEBUG] injected bgmPlayer=" + waitingRoom.getBgmPlayer());
                     waitingRoom.setMessageHandler(msg -> battlePanel.handleServerMessage(msg));
                 }
                 setContentPane(battlePanel);
@@ -619,5 +629,17 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         // 연결 버튼 클릭 시뮬레이션
         btnConnect.doClick();
     }
+
+	public void stopBgm() {
+		bgm.stopBgm();
+	}
+
+	public void pauseBgm() {
+		bgm.pauseBgm();
+	}
+
+	public void resumeBgm() {
+		bgm.resumeBgm();
+	}
 
 }

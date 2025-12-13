@@ -20,6 +20,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 
 public class JplWaitingRoom extends JPanel {
 	private static final long serialVersionUID = 1L;
@@ -104,6 +105,8 @@ public class JplWaitingRoom extends JPanel {
 	
 	private BattleStartListener battleStartListener;
 	private FrmSeverConnect frmParent; // 프레임 참조
+	
+	private final BgmPlayer bgmPlayer = new BgmPlayer();
 	
 	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener, FrmSeverConnect frame) {
 		this.username = username;
@@ -327,6 +330,7 @@ public class JplWaitingRoom extends JPanel {
 		add(lblOpponentStatus);
 		add(lblTimer);
 
+		bindClickSfxToAllButtons();
 		// 중앙 프리뷰가 버튼에 가려지지 않도록 최상위로 올립니다.
 		try {
 			// 우상단 타이머와 select overlay를 최상단으로 배치
@@ -389,6 +393,11 @@ public class JplWaitingRoom extends JPanel {
 			lblOpponentStatus.setVisible(true);
 			try { setComponentZOrder(lblOpponentStatus, 1); } catch (Exception ex) {}
 		}
+	}
+
+	private void bindClickSfxToAllButtons() {
+		 java.awt.Container root = this; // 현재 패널
+		 ButtonSfxBinder.bindAllButtons(root, bgmPlayer, "bgm/ding.wav", -10.0f);
 	}
 
 	/**
@@ -656,6 +665,19 @@ public class JplWaitingRoom extends JPanel {
 				lblMyStatus.setText("■ " + username + "(나): 포켓몬 선택 완료");
 				lblMyStatus.setForeground(new Color(0, 190, 0)); // 초록
 				startStatusTyping(pokemonName + "(이)가 당신의 파트너로 선택 되었습니다.");
+				if (battleStartListener instanceof FrmSeverConnect) {
+		            ((FrmSeverConnect) battleStartListener).pauseBgm(); 
+		        }
+
+		        // ready브금
+		        bgmPlayer.playSfxOnce("bgm/ready.wav", -6.0f, () -> {
+		            SwingUtilities.invokeLater(() -> {
+		                // 전투 시작 전이면 메인 브금 재개
+		                if (!gameStarting && battleStartListener instanceof FrmSeverConnect) {
+		                    ((FrmSeverConnect) battleStartListener).resumeBgm();
+		                }
+		            });
+		        });
 			}
 		} catch (IOException e) {
 			JOptionPane.showMessageDialog(this,
@@ -932,7 +954,10 @@ public class JplWaitingRoom extends JPanel {
 	        if (startCountdown <= 0) {  
 	            startCountdownTimer.stop();
 	            lblTimer.setText("0");
-
+	            bgmPlayer.playLoop("bgm/pokemon-battle.wav", -12.0f);
+	            if (battleStartListener instanceof FrmSeverConnect) {
+	                ((FrmSeverConnect) battleStartListener).stopBgm();
+	            }
 				if (battleStartListener != null) {
 					String myPokemonId = null;
 					if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
@@ -985,6 +1010,14 @@ public class JplWaitingRoom extends JPanel {
 	    if (clientService != null) {
 	        clientService.interrupt();
 	    }
+	}
+
+	public void stopBattleBgm() {
+		bgmPlayer.stopBgm();
+	}
+
+	public BgmPlayer getBgmPlayer() {
+		return bgmPlayer;
 	}
 
 }
