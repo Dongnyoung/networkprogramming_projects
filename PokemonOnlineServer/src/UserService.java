@@ -20,6 +20,20 @@ public class UserService extends Thread {
     String UserName = "";
     String selectedPokemon = ""; // 선택한 포켓몬
     boolean isReady = false;     // 준비 상태
+    
+    // 배틀 관련 변수
+    private String battlePokemonId = "";
+    private String battleSkillName = ""; // 기술 이름
+    private String battleSkillType = ""; // 기술 타입
+    private String battlePokemonType1 = ""; // 포켓몬 타입1
+    private String battlePokemonType2 = ""; // 포켓몬 타입2 (없으면 "")
+    private int battleSkillPower = 0;
+    private double battleSkillAccuracy = 1.0;
+    private int battleAttack = 0;
+    private int battleDefense = 0;
+    private int battleSpeed = 0;
+    private int battleLevel = 50;
+    private boolean battleDataReceived = false;
 
     public UserService(Socket client_socket, PokemonChatServer server) {
         this.client_socket = client_socket;
@@ -112,6 +126,202 @@ public class UserService extends Thread {
         }
         return true;
     }
+    
+    // 배틀 처리: 두 플레이어의 스킬 선택이 모두 완료되면 계산
+    private void processBattle() {
+        if (user_vc.size() != 2) {
+            server.AppendText("[배틀] 플레이어 수 부족: " + user_vc.size());
+            return;
+        }
+        
+        UserService user1 = user_vc.get(0);
+        UserService user2 = user_vc.get(1);
+        
+        // 두 사용자 모두 배틀 데이터를 보냈는지 확인
+        if (!user1.battleDataReceived || !user2.battleDataReceived) {
+            server.AppendText("[배틀] 대기중 - user1: " + user1.battleDataReceived + ", user2: " + user2.battleDataReceived);
+            return;
+        }
+        
+        server.AppendText("=== 배틀 처리 시작 ===");
+        server.AppendText("[배틀] " + user1.UserName + " vs " + user2.UserName);
+        
+        // 스탯 정보 로그
+        server.AppendText("[" + user1.UserName + "] 스탯 - 공:" + user1.battleAttack + " 방:" + user1.battleDefense + " 속:" + user1.battleSpeed);
+        server.AppendText("[" + user1.UserName + "] 스킬 - 위력:" + user1.battleSkillPower + " 명중:" + user1.battleSkillAccuracy);
+        server.AppendText("[" + user2.UserName + "] 스탯 - 공:" + user2.battleAttack + " 방:" + user2.battleDefense + " 속:" + user2.battleSpeed);
+        server.AppendText("[" + user2.UserName + "] 스킬 - 위력:" + user2.battleSkillPower + " 명중:" + user2.battleSkillAccuracy);
+        
+        // 선공 결정: 스피드 비교 (같으면 랜덤)
+        boolean user1First;
+        if (user1.battleSpeed > user2.battleSpeed) {
+            user1First = true;
+        } else if (user2.battleSpeed > user1.battleSpeed) {
+            user1First = false;
+        } else {
+            user1First = Math.random() < 0.5;
+        }
+        server.AppendText("[배틀] 선공: " + (user1First ? user1.UserName : user2.UserName) + " (속도: " + user1.battleSpeed + " vs " + user2.battleSpeed + ")");
+        
+        // 타입 상성 계산
+        double typeEffectiveness1to2 = getTypeEffectiveness(user1.battleSkillType, user2.battlePokemonType1, user2.battlePokemonType2);
+        double typeEffectiveness2to1 = getTypeEffectiveness(user2.battleSkillType, user1.battlePokemonType1, user1.battlePokemonType2);
+        
+        server.AppendText("[배틀] 타입 상성 - " + user1.battleSkillType + " → (" + user2.battlePokemonType1 + "," + user2.battlePokemonType2 + "): " + typeEffectiveness1to2 + "배");
+        server.AppendText("[배틀] 타입 상성 - " + user2.battleSkillType + " → (" + user1.battlePokemonType1 + "," + user1.battlePokemonType2 + "): " + typeEffectiveness2to1 + "배");
+        
+        // 데미지 계산 (타입 상성 포함)
+        int damage1to2 = calculateDamage(user1.battleLevel, user1.battleSkillPower, 
+                                        user1.battleAttack, user2.battleDefense, typeEffectiveness1to2);
+        int damage2to1 = calculateDamage(user2.battleLevel, user2.battleSkillPower, 
+                                        user2.battleAttack, user1.battleDefense, typeEffectiveness2to1);
+        
+        server.AppendText("[배틀] 데미지 계산 - " + user1.UserName + "→" + user2.UserName + ": " + damage1to2);
+        server.AppendText("[배틀] 데미지 계산 - " + user2.UserName + "→" + user1.UserName + ": " + damage2to1);
+        
+        // 명중 판정
+        boolean hit1 = Math.random() < user1.battleSkillAccuracy;
+        boolean hit2 = Math.random() < user2.battleSkillAccuracy;
+        
+        server.AppendText("[배틀] 명중 판정 - " + user1.UserName + ": " + (hit1 ? "명중" : "빗나감"));
+        server.AppendText("[배틀] 명중 판정 - " + user2.UserName + ": " + (hit2 ? "명중" : "빗나감"));
+        
+        // 빗나가면 데미지 0
+        if (!hit1) damage1to2 = 0;
+        if (!hit2) damage2to1 = 0;
+        
+        // 결과 전송: "선공유저명\n유저1닉네임,skillName,damage,hit\n유저2닉네임,skillName,damage,hit"
+        // damage는 각 유저가 **준** 데미지
+        String firstUser = user1First ? user1.UserName : user2.UserName;
+        String result = "/battle_result " + firstUser + "\n";
+        result += user1.UserName + "," + user1.battleSkillName + "," + damage1to2 + "," + (hit1 ? "1" : "0") + "\n";
+        result += user2.UserName + "," + user2.battleSkillName + "," + damage2to1 + "," + (hit2 ? "1" : "0");
+        
+        server.AppendText("[배틀] 최종 결과 전송: " + result.replace("\n", " | "));
+        
+        // 두 클라이언트에게 결과 전송
+        user1.WriteOne(result + "\n");
+        user2.WriteOne(result + "\n");
+
+        // 배틀 데이터 초기화
+        user1.battleDataReceived = false;
+        user1.battlePokemonId = "";
+        user1.battleSkillName = "";
+        user1.battleSkillType = "";
+        user1.battlePokemonType1 = "";
+        user1.battlePokemonType2 = "";
+        user1.battleSkillPower = 0;
+        user1.battleSkillAccuracy = 1.0;
+        user1.battleAttack = 0;
+        user1.battleDefense = 0;
+        user1.battleSpeed = 0;
+        user1.battleLevel = 50;
+        
+        user2.battleDataReceived = false;
+        user2.battlePokemonId = "";
+        user2.battleSkillName = "";
+        user2.battleSkillType = "";
+        user2.battlePokemonType1 = "";
+        user2.battlePokemonType2 = "";
+        user2.battleSkillPower = 0;
+        user2.battleSkillAccuracy = 1.0;
+        user2.battleAttack = 0;
+        user2.battleDefense = 0;
+        user2.battleSpeed = 0;
+        user2.battleLevel = 50;
+        
+        server.AppendText("=== 배틀 처리 완료 ===");
+    }
+    
+    // 데미지 계산 공식: (((2×level÷5+2) × power × (attack/defense)) ÷ 50 + 2) × modifier × typeEffectiveness
+    private int calculateDamage(int level, int power, int attack, int defense, double typeEffectiveness) {
+        double baseDamage = (((2.0 * level / 5.0 + 2) * power * ((double)attack / defense)) / 50.0 + 2);
+        
+        // 보정: 0.8 ~ 1.2 랜덤
+        double modifier = 0.8 + (Math.random() * 0.4);
+        
+        // 타입 상성 적용
+        int damage = (int)(baseDamage * modifier * typeEffectiveness);
+        
+        // 타입 상성이 0이면 데미지 0, 아니면 최소 1
+        return typeEffectiveness == 0 ? 0 : Math.max(1, damage);
+    }
+    
+    // 타입 인덱스 매핑
+    private static final String[] TYPE_NAMES = {
+        "NORMAL", "FIRE", "WATER", "GRASS", "ELECTRIC", "ICE",
+        "FIGHTING", "POISON", "GROUND", "FLYING", "PSYCHIC", "BUG",
+        "ROCK", "GHOST", "DRAGON", "DARK", "STEEL", "FAIRY"
+    };
+    
+    // 타입 상성표 [공격타입][방어타입] = 배율
+    private static final double[][] TYPE_CHART = {
+        // 공격: 노말
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0, 1.0, 1.0, 0.5, 1.0},
+        // 공격: 불꽃
+        {1.0, 0.5, 0.5, 2.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 0.5, 1.0, 0.5, 1.0, 2.0, 1.0},
+        // 공격: 물
+        {1.0, 2.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.5, 1.0, 1.0, 1.0},
+        // 공격: 풀
+        {1.0, 0.5, 2.0, 0.5, 1.0, 1.0, 1.0, 0.5, 2.0, 0.5, 1.0, 0.5, 2.0, 1.0, 0.5, 1.0, 0.5, 1.0},
+        // 공격: 전기
+        {1.0, 1.0, 2.0, 0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 2.0, 1.0, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0},
+        // 공격: 얼음
+        {1.0, 0.5, 0.5, 2.0, 1.0, 0.5, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.5, 1.0},
+        // 공격: 격투
+        {2.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.5, 1.0, 0.5, 0.5, 0.5, 2.0, 0.0, 1.0, 2.0, 2.0, 0.5},
+        // 공격: 독
+        {1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 0.5, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5, 1.0, 1.0, 0.0, 2.0},
+        // 공격: 땅
+        {1.0, 2.0, 1.0, 0.5, 2.0, 1.0, 1.0, 2.0, 1.0, 0.0, 1.0, 0.5, 2.0, 1.0, 1.0, 1.0, 2.0, 1.0},
+        // 공격: 비행
+        {1.0, 1.0, 1.0, 2.0, 0.5, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 2.0, 0.5, 1.0, 1.0, 1.0, 0.5, 1.0},
+        // 공격: 에스퍼
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 1.0},
+        // 공격: 벌레
+        {1.0, 0.5, 1.0, 2.0, 1.0, 1.0, 0.5, 0.5, 1.0, 0.5, 2.0, 1.0, 1.0, 0.5, 1.0, 2.0, 0.5, 0.5},
+        // 공격: 바위
+        {1.0, 2.0, 1.0, 1.0, 1.0, 2.0, 0.5, 1.0, 0.5, 2.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 0.5, 1.0},
+        // 공격: 고스트
+        {0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 0.5, 1.0, 1.0},
+        // 공격: 드래곤
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.5, 0.0},
+        // 공격: 악
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 0.5, 1.0, 0.5},
+        // 공격: 강철
+        {1.0, 0.5, 0.5, 1.0, 0.5, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 0.5, 2.0},
+        // 공격: 페어리
+        {1.0, 0.5, 1.0, 1.0, 1.0, 1.0, 2.0, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 0.5, 1.0}
+    };
+    
+    // 타입 상성 계산
+    private double getTypeEffectiveness(String attackType, String defenseType1, String defenseType2) {
+        double multiplier1 = getTypeSingle(attackType, defenseType1);
+        double multiplier2 = defenseType2.isEmpty() ? 1.0 : getTypeSingle(attackType, defenseType2);
+        return multiplier1 * multiplier2;
+    }
+    
+    // 단일 타입 상성 (2차원 배열 기반)
+    private double getTypeSingle(String attackType, String defenseType) {
+        if (attackType.isEmpty() || defenseType.isEmpty()) return 1.0;
+        
+        int attackIndex = getTypeIndex(attackType.toUpperCase());
+        int defenseIndex = getTypeIndex(defenseType.toUpperCase());
+        
+        if (attackIndex == -1 || defenseIndex == -1) return 1.0;
+        
+        return TYPE_CHART[attackIndex][defenseIndex];
+    }
+    
+    // 타입 이름으로 인덱스 찾기
+    private int getTypeIndex(String typeName) {
+        for (int i = 0; i < TYPE_NAMES.length; i++) {
+            if (TYPE_NAMES[i].equals(typeName)) {
+                return i;
+            }
+        }
+        return -1; // 없으면 -1
+    }
 
     @Override
     public void run() {
@@ -194,6 +404,46 @@ public class UserService extends Thread {
                             WriteAll("/start_game " + bgNumber + "\n");
                             server.AppendText("모든 사용자가 준비완료! 게임을 시작합니다. (배경: " + bgNumber + ")");
                         }
+                        break;
+
+                    case "/battle": // 배틀 스킬 사용
+                        // 프로토콜: /battle pokemonId skillName skillType pokemonType1 pokemonType2 skillPower skillAccuracy attack defense speed level
+                        if (args.length >= 12) {
+                            battlePokemonId = args[1];
+                            battleSkillName = args[2];
+                            battleSkillType = args[3];
+                            battlePokemonType1 = args[4];
+                            battlePokemonType2 = args[5];
+                            battleSkillPower = Integer.parseInt(args[6]);
+                            battleSkillAccuracy = Double.parseDouble(args[7]);
+                            battleAttack = Integer.parseInt(args[8]);
+                            battleDefense = Integer.parseInt(args[9]);
+                            battleSpeed = Integer.parseInt(args[10]);
+                            battleLevel = Integer.parseInt(args[11]);
+                            battleDataReceived = true;
+                            
+                            server.AppendText(UserName + "님이 스킬 사용 (" + battleSkillName + "[" + battleSkillType + "], 위력: " + battleSkillPower + ")");
+                            
+                            // 두 명의 플레이어가 모두 스킬을 선택했는지 확인
+                            processBattle();
+                        }
+                        break;
+
+                    case "/battle_end": // 배틀 종료 신호
+                        // 배틀 관련 변수 초기화
+                        battleDataReceived = false;
+                        battlePokemonId = "";
+                        battleSkillName = "";
+                        battleSkillType = "";
+                        battlePokemonType1 = "";
+                        battlePokemonType2 = "";
+                        battleSkillPower = 0;
+                        battleSkillAccuracy = 1.0;
+                        battleAttack = 0;
+                        battleDefense = 0;
+                        battleSpeed = 0;
+                        battleLevel = 50;
+                        server.AppendText(UserName + "님의 배틀 종료");
                         break;
 
                     default: // 일반 메시지 처리

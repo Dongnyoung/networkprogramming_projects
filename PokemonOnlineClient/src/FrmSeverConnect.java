@@ -57,6 +57,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
     // 현재 화면 패널 / 대기실 패널
     private JPanel currentPanel;
     private JplWaitingRoom waitingPanel;   // JPanel 버전의 대기실
+    public JplBattlePanel battlePanel;     // 배틀 패널 참조
 
     /**
      * Launch the application.
@@ -303,7 +304,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         // 테스트 버튼 액션 (몬스터볼 모션 및 배틀 화면 테스트)
         btnTest.addActionListener(e -> {
             // 임의의 포켓몬 2마리로 배틀 시작 squirtle / bulbasaur / charmander
-            onBattleStartRequest("charmander", "bulbasaur", "테스트상대", null, null, null, 1);
+            onBattleStartRequest("테스터", "charmander", "bulbasaur", "테스트상대", null, null, null, 1);
         });
 
         PnlBackGround.add(lblIP);
@@ -521,7 +522,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
 
                     if (ok) {
                         // 연결 성공: 대기실로 전환
-                        waitingPanel = new JplWaitingRoom(username, ip, port, FrmSeverConnect.this);
+                        waitingPanel = new JplWaitingRoom(username, ip, port, FrmSeverConnect.this, FrmSeverConnect.this);
                         setContentPane(waitingPanel);
                         pack();
                         setLocationRelativeTo(null);
@@ -541,7 +542,8 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
     }
 
     @Override
-    public void onBattleStartRequest(String myPokemonId, 
+    public void onBattleStartRequest(String myUsername,
+                                     String myPokemonId, 
     								 String enemyPokemonId,
                                      String opponentName,
                                      Socket socket,
@@ -576,9 +578,10 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
                     getLayeredPane().remove(transitionPanelHolder[0]);
                 }
                 
-                JplBattlePanel battlePanel = new JplBattlePanel(
+                battlePanel = new JplBattlePanel(
                         myPokemon,
                         enemyPokemon,
+                        myUsername,
                         opponentName,
                         socket,
                         dis,
@@ -598,6 +601,16 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         getLayeredPane().add(transitionPanelHolder[0], JLayeredPane.POPUP_LAYER);
         revalidate();
         repaint();
+    }
+    
+    // 자동 연결 메서드 (다시하기에서 사용)
+    public void autoConnect(String ip, String port, String username) {
+        txtIP.setText(ip);
+        txtPort.setText(port);
+        txtName.setText(username);
+        
+        // 연결 버튼 클릭 시뮬레이션
+        btnConnect.doClick();
     }
 
 }

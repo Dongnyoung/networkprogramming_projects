@@ -32,7 +32,7 @@
     "koreanName": "이상해씨",
     "level": 5,
     "baseHp": 45,
-    "baseAttack": 57,
+    "baseAttack": 999,
     "baseDefense": 57,
     "baseSpeed": 45,
     "type1": "GRASS",

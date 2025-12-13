@@ -50,6 +50,11 @@ public class Pokemon {
     // 런타임 상태: 현재 남은 체력
     private int currentHp;
 
+    // 계산된 스탯
+    private int attack;
+    private int defense;
+    private int speed;
+
     public Pokemon() {}
 
     public Pokemon(String id, String koreanName, int level,
@@ -70,6 +75,10 @@ public class Pokemon {
         // set current HP to max on create
         this.maxHp = calcMaxHp();
         this.currentHp = this.maxHp;
+        // 스탯 계산
+        this.attack = calcAttack();
+        this.defense = calcDefense();
+        this.speed = calcSpeed();
 
     }
 
@@ -122,9 +131,33 @@ public class Pokemon {
     public int getCurrentHp() { return currentHp; }
     public void setCurrentHp(int currentHp) { this.currentHp = Math.max(0, Math.min(currentHp, this.maxHp)); }
 
+    public int getAttack() { return attack; }
+    public void setAttack(int attack) { this.attack = attack; }
+
+    public int getDefense() { return defense; }
+    public void setDefense(int defense) { this.defense = defense; }
+
+    public int getSpeed() { return speed; }
+    public void setSpeed(int speed) { this.speed = speed; }
+
     public int calcMaxHp() {
         // HP = ((종족값 × 2 × 레벨) ÷ 100) + 레벨 + 10
         return ((baseHp * 2 * level) / 100) + level + 10;
+    }
+
+    public int calcAttack() {
+        // 공격 = ((종족값 × 2 × 레벨) ÷ 100) + 5
+        return ((baseAttack * 2 * level) / 100) + 5;
+    }
+
+    public int calcDefense() {
+        // 방어 = ((종족값 × 2 × 레벨) ÷ 100) + 5
+        return ((baseDefense * 2 * level) / 100) + 5;
+    }
+
+    public int calcSpeed() {
+        // 스피드 = ((종족값 × 2 × 레벨) ÷ 100) + 5
+        return ((baseSpeed * 2 * level) / 100) + 5;
     }
 
     public void takeDamage(int d) {

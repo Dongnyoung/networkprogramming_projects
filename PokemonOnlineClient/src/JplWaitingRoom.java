@@ -97,10 +97,12 @@ public class JplWaitingRoom extends JPanel {
 	private boolean selectionLocked = false;
 	
 	private BattleStartListener battleStartListener;
+	private FrmSeverConnect frmParent; // 프레임 참조
 	
-	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener) {
+	public JplWaitingRoom(String username, String ip, String port, BattleStartListener battleStartListener, FrmSeverConnect frame) {
 		this.username = username;
 		this.battleStartListener = battleStartListener;
+		this.frmParent = frame;
 		setLayout(null);
 		
 		// 배경 이미지 로드
@@ -459,7 +461,7 @@ public class JplWaitingRoom extends JPanel {
 		typingTarget = (message == null) ? "" : message;
 		typingIndex = 0;
 		lblStatus.setText("");
-		int delay = 70; // ms per character
+		int delay = 40; // ms per character
 		statusTypingTimer = new Timer(delay, ev -> {
 			if (typingIndex <= typingTarget.length()) {
 				typingIndex++;
@@ -821,7 +823,25 @@ public class JplWaitingRoom extends JPanel {
 	        return;
 	    }
 
-	    // 그 외 메시지 (로그용)
+    // 6) 배틀 결과 메시지
+    if (message.startsWith("/battle_result ")) {
+        // 배틀 패널로 메시지 전달
+        if (frmParent != null && frmParent.battlePanel != null) {
+            frmParent.battlePanel.handleBattleResult(message);
+        }
+        return;
+    }
+
+    // 7) 퇴장 메시지: "[이름]님이 퇴장 하였습니다."
+    if (message.contains("님이 퇴장 하였습니다.")) {
+        // 배틀 중이면 상대방 연결 끊김 처리
+        if (frmParent != null && frmParent.battlePanel != null) {
+            frmParent.battlePanel.handleOpponentDisconnect();
+        }
+        return;
+    }
+
+    // 그 외 메시지 (로그용)
 	    System.out.println("[INFO] Unhandled message: " + message);
 	}
 
@@ -852,9 +872,15 @@ public class JplWaitingRoom extends JPanel {
 				}
 			} catch (IOException e) {
 				javax.swing.SwingUtilities.invokeLater(() -> {
-					JOptionPane.showMessageDialog(JplWaitingRoom.this,
-							"서버 연결이 끊어졌습니다.",
-							"연결 종료", JOptionPane.ERROR_MESSAGE);
+					// 배틀 중이면 배틀 패널에서 처리
+					if (frmParent != null && frmParent.battlePanel != null) {
+						frmParent.battlePanel.handleOpponentDisconnect();
+					} else {
+						// 대기실에서는 팁업 표시
+						JOptionPane.showMessageDialog(JplWaitingRoom.this,
+								"서버 연결이 끊어졌습니다.",
+								"연결 종료", JOptionPane.ERROR_MESSAGE);
+					}
 				});
 			}
 		}
@@ -910,6 +936,7 @@ public class JplWaitingRoom extends JPanel {
 	                }
 	             	// 여기서 상대 포켓몬 id와 배경 번호까지 넘김
 	                battleStartListener.onBattleStartRequest(
+	                        username,            // 내 유저명 추가
 	                        myPokemonId,
 	                        opponentPokemonId,   // 새로 추가된 필드
 	                        opponentName,
