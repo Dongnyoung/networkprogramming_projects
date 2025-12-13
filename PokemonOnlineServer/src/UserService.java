@@ -13,6 +13,7 @@ public class UserService extends Thread {
     private DataInputStream dis;
     private DataOutputStream dos;
     private Socket client_socket;
+    private boolean validUser = false;   // 로그인 성공한 진짜 유저만 true
 
     private Vector<UserService> user_vc; // 제네릭 타입 사용
     private PokemonChatServer server;    // 서버 객체 참조
@@ -47,21 +48,45 @@ public class UserService extends Thread {
             dos = new DataOutputStream(os);
 
             // 제일 처음 연결되면 "/login UserName" 문자열이 들어옴
-            String line1 = dis.readUTF();
+            // 제일 처음 연결되면 "/login UserName" 또는 "/probe" 가 들어올 수 있음
+            String line1 = dis.readUTF().trim();
+
+            if (line1.equals("/probe")) {
+                server.AppendText("-----------");
+                server.AppendText("[PROBE] 서버 연결 테스트 접속 확인 (" + client_socket.getInetAddress() + ")");
+                server.AppendText("-----------");
+                try { client_socket.close(); } catch (Exception ignore) {}
+                return; // validUser는 false 그대로
+            }
+
+
+            //  2) 정상 로그인 처리
             String[] msg = line1.split(" ");
+            if (msg.length < 2 || !msg[0].equals("/login")) {
+                server.AppendText("[WARN] 잘못된 첫 메시지: " + line1);
+                try { client_socket.close(); } catch (Exception ignore) {}
+                return;
+            }
+
             UserName = msg[1].trim();
-
+            validUser = true;    
+            user_vc.add(this);
             server.AppendText("새로운 참가자 " + UserName + " 입장.");
-
+            server.AppendText("사용자 입장. 현재 참가자 수 " + user_vc.size());
             // 이미 접속 중인 사용자 정보를 새 참가자에게 전달
             for (int i = 0; i < user_vc.size(); i++) {
-                UserService existing = user_vc.get(i);
+            	UserService existing = user_vc.get(i);
+                if (existing == this) continue;
+
                 String status = existing.isReady ? "ready" : "waiting";
-                String pokemonInfo =
-                        (existing.selectedPokemon == null || existing.selectedPokemon.isEmpty())
-                                ? "-" : existing.selectedPokemon;
-                WriteOne("/opponent_info " + existing.UserName + " " + status + " " + pokemonInfo + "\n");
-                existing.WriteOne("/opponent_info " + UserName + " waiting -\n");
+                String pokemonInfo = (existing.selectedPokemon == null || existing.selectedPokemon.isEmpty())
+                        ? "-" : existing.selectedPokemon;
+
+                // 새로 들어온 나에게: 기존 유저들 정보
+                WriteOne("/opponent_info " + existing.UserName + " " + status + " " + pokemonInfo);
+
+                // 기존 유저들에게: 새 유저(나) 정보
+                existing.WriteOne("/opponent_info " + UserName + " waiting -");
 
             }
             
@@ -69,7 +94,8 @@ public class UserService extends Thread {
             String br_msg = "[" + UserName + "]님이 입장 하였습니다.\n";
             WriteAll(br_msg); // 아직 user_vc에 본인은 포함되지 않음
         } catch (Exception e) {
-            server.AppendText("userService error");
+        	server.AppendText("[UserService 생성자] error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            try { client_socket.close(); } catch (Exception ignore) {}
         }
     }
 
@@ -325,6 +351,7 @@ public class UserService extends Thread {
 
     @Override
     public void run() {
+    	if(!validUser) return; //probe 또는 오류  연결은 스레드 즉시종료 
         while (true) {
             try {
                 String msg = dis.readUTF();
@@ -338,6 +365,14 @@ public class UserService extends Thread {
                     case "/exit": // 종료 명령
                         logout();
                         return;
+                   
+                    case "/chat": {
+                        String body = (msg.length() >= 6) ? msg.substring(6).trim() : "";
+                        if (!body.isEmpty()) {
+                            WriteAll("/chat [" + UserName + "] " + body); // \n 붙이지 말기 추천
+                        }
+                        break;
+                    }
 
                     case "/list": // 접속자 목록 보기
                         WriteOne("**현재 사용자 목록**\n");

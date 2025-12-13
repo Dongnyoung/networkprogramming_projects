@@ -76,6 +76,12 @@ public class JplWaitingRoom extends JPanel {
 	private DataInputStream dis;
 	private DataOutputStream dos;
 	private ClientService clientService;
+	private volatile boolean running = true;
+	private java.util.function.Consumer<String> messageHandler; // 현재 화면에 메시지 전달
+
+	private boolean gameStarting = false;
+
+	
 	private String username;
 	private String opponentName = "";
 	private boolean myReady = false;
@@ -87,7 +93,7 @@ public class JplWaitingRoom extends JPanel {
 	private int backgroundNumber = 1;
 	// 포켓몬 이름들 (이미지 파일명과 매칭)
 	private String[] pokemonNames = {"이상해씨", "파이리", "꼬부기"};
-	// 포켓몬 종 id들 (pokemon_species.json의 id와 매칭)
+	
 	private String[] pokemonIds = {"bulbasaur", "charmander", "squirtle"};
 	
 	// 중앙 미리보기 라벨(배경)과 몬스터 이미지 라벨
@@ -127,7 +133,10 @@ public class JplWaitingRoom extends JPanel {
 			
 			// 클라이언트 서비스 스레드 시작
 			clientService = new ClientService();
+			setMessageHandler(this::handleServerMessage); // waitingRoom의 핸들러 세팅
 			clientService.start();
+
+
 			
 		} catch (IOException e) {
 			JOptionPane.showMessageDialog(this,
@@ -819,20 +828,13 @@ public class JplWaitingRoom extends JPanel {
 	    	} else {
 	    		backgroundNumber = 1; // 기본값
 	    	}
-	    	startGameCountdown();
+	    	if (gameStarting) return;
+	        gameStarting = true;
+	        startGameCountdown();
 	        return;
 	    }
 
-    // 6) 배틀 결과 메시지
-    if (message.startsWith("/battle_result ")) {
-        // 배틀 패널로 메시지 전달
-        if (frmParent != null && frmParent.battlePanel != null) {
-            frmParent.battlePanel.handleBattleResult(message);
-        }
-        return;
-    }
-
-    // 7) 퇴장 메시지: "[이름]님이 퇴장 하였습니다."
+    // 6) 퇴장 메시지: "[이름]님이 퇴장 하였습니다."
     if (message.contains("님이 퇴장 하였습니다.")) {
         // 배틀 중이면 상대방 연결 끊김 처리
         if (frmParent != null && frmParent.battlePanel != null) {
@@ -846,45 +848,47 @@ public class JplWaitingRoom extends JPanel {
 	}
 
 	public void disconnect() {
-		try {
-			if (dos != null) {
-				dos.writeUTF("/exit");
-			}
-			if (dis != null) dis.close();
-			if (dos != null) dos.close();
-			if (socket != null) socket.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	    try {
+	        if (dos != null) dos.writeUTF("/exit");
+	    } catch (IOException ignore) {}
+	    stopService(); // 여기서 close까지 다 함
 	}
+
 	
 	// 서버와 통신하는 스레드
 	class ClientService extends Thread {
-		@Override
-		public void run() {
-			try {
-				while (true) {
-					String msg = dis.readUTF();
-					// Swing 이벤트 스레드에서 UI 업데이트
-					javax.swing.SwingUtilities.invokeLater(() -> {
-						handleServerMessage(msg);
-					});
-				}
-			} catch (IOException e) {
-				javax.swing.SwingUtilities.invokeLater(() -> {
-					// 배틀 중이면 배틀 패널에서 처리
-					if (frmParent != null && frmParent.battlePanel != null) {
-						frmParent.battlePanel.handleOpponentDisconnect();
-					} else {
-						// 대기실에서는 팁업 표시
-						JOptionPane.showMessageDialog(JplWaitingRoom.this,
-								"서버 연결이 끊어졌습니다.",
-								"연결 종료", JOptionPane.ERROR_MESSAGE);
-					}
-				});
-			}
-		}
+	    @Override
+	    public void run() {
+	        try {
+	            while (running) {
+	                String msg = dis.readUTF();
+
+	                java.util.function.Consumer<String> handler = messageHandler;
+	                if (handler != null) {
+	                    javax.swing.SwingUtilities.invokeLater(() -> handler.accept(msg));
+	                } else {
+	                    // 핸들러 없으면 기본은 waitingroom이 처리
+	                    javax.swing.SwingUtilities.invokeLater(() -> handleServerMessage(msg));
+	                }
+	            }
+	        } catch (IOException e) {
+	            if (!running) return;
+	            javax.swing.SwingUtilities.invokeLater(() -> {
+	                if (frmParent != null && frmParent.battlePanel != null) {
+	                    frmParent.battlePanel.handleOpponentDisconnect();
+	                } else {
+	                    JOptionPane.showMessageDialog(
+	                        JplWaitingRoom.this,
+	                        "서버와의 연결이 끊어졌습니다.",
+	                        "연결 오류",
+	                        JOptionPane.ERROR_MESSAGE
+	                    );
+	                }
+	            });
+	        }
+	    }
 	}
+
 	
 	@Override
 	protected void paintComponent(Graphics g) {
@@ -929,23 +933,24 @@ public class JplWaitingRoom extends JPanel {
 	            startCountdownTimer.stop();
 	            lblTimer.setText("0");
 
-	            if (battleStartListener != null) {
-	            	String myPokemonId = null;
-	                if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
-	                    myPokemonId = pokemonIds[selectedPokemon - 1];
-	                }
-	             	// 여기서 상대 포켓몬 id와 배경 번호까지 넘김
-	                battleStartListener.onBattleStartRequest(
-	                        username,            // 내 유저명 추가
-	                        myPokemonId,
-	                        opponentPokemonId,   // 새로 추가된 필드
-	                        opponentName,
-	                        socket,
-	                        dis,
-	                        dos,
-	                        backgroundNumber    // 서버에서 받은 배경 번호
-	                );	            
-	            }
+				if (battleStartListener != null) {
+					String myPokemonId = null;
+					if (selectedPokemon >= 1 && selectedPokemon <= pokemonIds.length) {
+						myPokemonId = pokemonIds[selectedPokemon - 1];
+					}
+					// 여기서 상대 포켓몬 id와 배경 번호까지 넘김
+					battleStartListener.onBattleStartRequest(
+							username,
+							myPokemonId,
+							opponentPokemonId,
+							opponentName,
+							socket,
+							dis,
+							dos,
+							backgroundNumber,
+							this
+					);	            
+				}
 	        } else {
 	            lblTimer.setText(String.valueOf(startCountdown));
 	        }
@@ -965,6 +970,21 @@ public class JplWaitingRoom extends JPanel {
 	        }
 	    }
 	    return null;
+	}
+
+	public void setMessageHandler(java.util.function.Consumer<String> handler) {
+	    this.messageHandler = handler;
+	}
+
+	public void stopService() {
+	    running = false;
+	    try { if (dis != null) dis.close(); } catch (Exception ignore) {}
+	    try { if (dos != null) dos.close(); } catch (Exception ignore) {}
+	    try { if (socket != null) socket.close(); } catch (Exception ignore) {}
+
+	    if (clientService != null) {
+	        clientService.interrupt();
+	    }
 	}
 
 }
