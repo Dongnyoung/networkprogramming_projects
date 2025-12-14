@@ -1467,6 +1467,12 @@ public class JplBattlePanel extends JPanel {
             return;
         }
 
+        // 퇴장 메시지 처리
+        if (message.contains("님이 퇴장 하였습니다.")) {
+            handleOpponentDisconnect();
+            return;
+        }
+
         if (message.startsWith("/chat ")) {
             String chatMsg = message.substring(6);
             appendChat(chatMsg);

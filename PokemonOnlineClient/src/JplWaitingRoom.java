@@ -21,6 +21,8 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.JFrame;
+import java.awt.Window;
 
 public class JplWaitingRoom extends JPanel {
 	private static final long serialVersionUID = 1L;
@@ -884,6 +886,35 @@ public class JplWaitingRoom extends JPanel {
 	        try {
 	            while (running) {
 	                String msg = dis.readUTF();
+
+	                // 서버 만원 메시지 체크
+	                if (msg.trim().equals("/server_full")) {
+	                    running = false;
+	                    javax.swing.SwingUtilities.invokeLater(() -> {
+	                        JOptionPane.showMessageDialog(
+	                            JplWaitingRoom.this,
+	                            "현재 서버 접속 인원이 가득 찼습니다.\n잠시 후 다시 시도해주세요.",
+	                            "접속 불가",
+	                            JOptionPane.WARNING_MESSAGE
+	                        );
+	                        // 메인 화면으로 돌아가기
+	                        Window window = SwingUtilities.getWindowAncestor(JplWaitingRoom.this);
+	                        if (window instanceof JFrame) {
+	                            JFrame frame = (JFrame) window;
+	                            frame.dispose();
+	                            SwingUtilities.invokeLater(() -> {
+	                                try {
+	                                    FrmSeverConnect newFrame = new FrmSeverConnect();
+	                                    newFrame.setVisible(true);
+	                                } catch (Exception ex) {
+	                                    ex.printStackTrace();
+	                                }
+	                            });
+	                        }
+	                    });
+	                    stopService();
+	                    return;
+	                }
 
 	                java.util.function.Consumer<String> handler = messageHandler;
 	                if (handler != null) {

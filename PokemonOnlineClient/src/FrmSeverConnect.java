@@ -318,7 +318,7 @@ public class FrmSeverConnect extends JFrame implements BattleStartListener{
         PnlBackGround.add(txtName);
         PnlBackGround.add(btnConnect);
         PnlBackGround.add(btnExit);
-        PnlBackGround.add(btnTest);
+        //PnlBackGround.add(btnTest);
         // (Auto 버튼 제거 — 자동으로 초기값을 채움)
 
         currentPanel = PnlBackGround;     // 현재 화면

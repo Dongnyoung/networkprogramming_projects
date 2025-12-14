@@ -68,6 +68,18 @@ public class UserService extends Thread {
                 return;
             }
 
+            // 3) 인원 제한 체크 (2명까지만)
+            if (user_vc.size() >= 2) {
+                server.AppendText("[WARN] 접속 인원 초과 - 연결 거부");
+                try {
+                    dos.writeUTF("/server_full");
+                    dos.flush();
+                    Thread.sleep(100); // 메시지 전송 대기
+                } catch (Exception ignore) {}
+                try { client_socket.close(); } catch (Exception ignore) {}
+                return;
+            }
+
             UserName = msg[1].trim();
             validUser = true;    
             user_vc.add(this);
