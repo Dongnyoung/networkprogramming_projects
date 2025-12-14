@@ -1,0 +1,44 @@
+[
+  {
+    "id": "charmander",
+    "koreanName": "파이리",
+    "level": 5,
+    "baseHp": 39,
+    "baseAttack": 56,
+    "baseDefense": 46,
+    "baseSpeed": 65,
+    "type1": "FIRE",
+    "type2": null,
+    "front": "Images/charmander_front.png",
+    "back": "Images/charmander_back.png",
+    "skills": ["ember", "firefang" ,"scratch", "tackle"]
+  },
+  {
+    "id": "squirtle",
+    "koreanName": "꼬부기",
+    "level": 5,
+    "baseHp": 44,
+    "baseAttack": 49,
+    "baseDefense": 65,
+    "baseSpeed": 43,
+    "type1": "WATER",
+    "type2": null,
+    "front": "Images/squirtle_front.png",
+    "back": "Images/squirtle_back.png",
+    "skills": ["tackle", "watergun", "rapidspin", "waterpulse"]
+  },
+  {
+    "id": "bulbasaur",
+    "koreanName": "이상해씨",
+    "level": 5,
+    "baseHp": 45,
+    "baseAttack": 57,
+    "baseDefense": 57,
+    "baseSpeed": 45,
+    "type1": "GRASS",
+    "type2": "POISON",
+    "front": "Images/bulbasaur_front.png",
+    "back": "Images/bulbasaur_back.png",
+    "skills": ["tackle", "vinewhip", "slash", "razorleaf"]
+  }
+]

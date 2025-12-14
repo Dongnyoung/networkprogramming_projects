@@ -1,0 +1,12 @@
+[
+  { "id": "scratch", "koreanName": "할퀴기", "type": "NORMAL", "power": 40, "accuracy": 1.0 },
+  { "id": "ember", "koreanName": "불꽃세례", "type": "FIRE", "power": 40, "accuracy": 0.95 },
+  { "id": "firefang", "koreanName": "불꽃엄니", "type": "FIRE", "power": 65, "accuracy": 0.95 },
+  { "id": "rapidspin", "koreanName": "고속스핀", "type": "NORMAL", "power": 50, "accuracy": 1.0 },
+  { "id": "waterpulse", "koreanName": "물의파동", "type": "WATER", "power": 60, "accuracy": 1.0 },
+  { "id": "slash", "koreanName": "베어가르기", "type": "NORMAL", "power": 70, "accuracy": 1.0 },
+  { "id": "razorleaf", "koreanName": "잎날가르기", "type": "GRASS", "power": 55, "accuracy": 0.95 },
+  { "id": "tackle", "koreanName": "몸통박치기", "type": "NORMAL", "power": 40, "accuracy": 1.0 },
+  { "id": "watergun", "koreanName": "물대포", "type": "WATER", "power": 40, "accuracy": 0.95 },
+  { "id": "vinewhip", "koreanName": "덩굴채찍", "type": "GRASS", "power": 45, "accuracy": 0.95 }
+]
